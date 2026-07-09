@@ -96,7 +96,7 @@ export function Alerts() {
 	return (
 		<div class="flex flex-col gap-6 w-full pb-8">
 			{/* Page Header */}
-			<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-brand-surface border border-brand-border rounded-3xl p-6">
+			<header class="flex flex-col m-6 md:flex-row md:items-center md:justify-between gap-4 bg-brand-surface border border-brand-border rounded-3xl p-6">
 				<div>
 					<h1 class="text-2xl font-bold text-slate-100">Alert History</h1>
 					<p class="text-sm text-accent mt-1">Notification dispatch & acknowledgement audit</p>
@@ -150,7 +150,7 @@ export function Alerts() {
 			</header>
 
 			{/* Stats Overview Grid */}
-			<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+			<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-0 m-6">
 				{/* Stat Card 1 */}
 				<div class="bg-brand-surface border border-brand-border rounded-3xl p-5 flex items-center gap-4">
 					<div class="flex items-center justify-center w-12 h-12 bg-teal-500/10 text-teal-400 rounded-full border border-teal-500/20 shadow-[0_0_10px_rgba(20,184,166,0.05)]">
@@ -205,7 +205,7 @@ export function Alerts() {
 			</section>
 
 			{/* Notifications Panel */}
-			<section class="bg-brand-surface border border-brand-border rounded-3xl p-6 overflow-hidden">
+			<section class="bg-brand-surface mt-0 m-6 border border-brand-border rounded-3xl p-6 overflow-hidden">
 				<div class="flex flex-col gap-1 mb-6">
 					<div class="flex items-center gap-2 text-slate-100 font-bold">
 						<span class="text-accent">
@@ -237,13 +237,12 @@ export function Alerts() {
 									<td class="py-4 px-4 font-mono text-slate-400">
 										<div class="flex items-center gap-3">
 											<span
-												class={`w-1 h-8 rounded-full shrink-0 ${
-													alert.indicatorColor === 'teal'
-														? 'bg-accent shadow-[0_0_8px_rgba(20,184,166,0.4)]'
-														: alert.indicatorColor === 'yellow'
+												class={`w-1 h-8 rounded-full shrink-0 ${alert.indicatorColor === 'teal'
+													? 'bg-accent shadow-[0_0_8px_rgba(20,184,166,0.4)]'
+													: alert.indicatorColor === 'yellow'
 														? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
 														: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]'
-												}`}
+													}`}
 											/>
 											<div class="flex flex-col leading-tight">
 												<span class="text-slate-200 font-medium">{alert.date}</span>
@@ -273,11 +272,10 @@ export function Alerts() {
 											{/* YES pill */}
 											<button
 												type="button"
-												class={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${
-													alert.acknowledged === 'Yes'
-														? 'bg-emerald-500 border-emerald-500 text-brand-bg shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-														: 'bg-transparent border-emerald-500/20 text-emerald-500/70 hover:bg-emerald-500/5 hover:text-emerald-500'
-												}`}
+												class={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${alert.acknowledged === 'Yes'
+													? 'bg-emerald-500 border-emerald-500 text-brand-bg shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+													: 'bg-transparent border-emerald-500/20 text-emerald-500/70 hover:bg-emerald-500/5 hover:text-emerald-500'
+													}`}
 												onClick={() => toggleAck(alert.id, 'Yes')}
 											>
 												Yes
@@ -286,11 +284,10 @@ export function Alerts() {
 											{/* NO pill */}
 											<button
 												type="button"
-												class={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${
-													alert.acknowledged === 'No'
-														? 'bg-amber-500 border-amber-500 text-brand-bg shadow-[0_0_12px_rgba(245,158,11,0.2)]'
-														: 'bg-transparent border-amber-500/20 text-amber-500/70 hover:bg-amber-500/5 hover:text-amber-500'
-												}`}
+												class={`px-3 py-1 rounded-lg text-xs font-bold transition-all border ${alert.acknowledged === 'No'
+													? 'bg-amber-500 border-amber-500 text-brand-bg shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+													: 'bg-transparent border-amber-500/20 text-amber-500/70 hover:bg-amber-500/5 hover:text-amber-500'
+													}`}
 												onClick={() => toggleAck(alert.id, 'No')}
 											>
 												No
@@ -331,33 +328,30 @@ export function Alerts() {
 						{/* Number indicators */}
 						<button
 							type="button"
-							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${
-								currentPage === 1
-									? 'bg-accent/10 border-accent/20 text-accent font-bold shadow-[0_0_8px_rgba(20,184,166,0.1)]'
-									: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-							}`}
+							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${currentPage === 1
+								? 'bg-accent/10 border-accent/20 text-accent font-bold shadow-[0_0_8px_rgba(20,184,166,0.1)]'
+								: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
+								}`}
 							onClick={() => setCurrentPage(1)}
 						>
 							1
 						</button>
 						<button
 							type="button"
-							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${
-								currentPage === 2
-									? 'bg-accent/10 border-accent/20 text-accent font-bold'
-									: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-							}`}
+							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${currentPage === 2
+								? 'bg-accent/10 border-accent/20 text-accent font-bold'
+								: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
+								}`}
 							onClick={() => setCurrentPage(2)}
 						>
 							2
 						</button>
 						<button
 							type="button"
-							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${
-								currentPage === 3
-									? 'bg-accent/10 border-accent/20 text-accent font-bold'
-									: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-							}`}
+							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${currentPage === 3
+								? 'bg-accent/10 border-accent/20 text-accent font-bold'
+								: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
+								}`}
 							onClick={() => setCurrentPage(3)}
 						>
 							3

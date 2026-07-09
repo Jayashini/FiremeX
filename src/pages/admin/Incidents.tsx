@@ -82,7 +82,7 @@ export function Incidents() {
 	return (
 		<div class="flex flex-col gap-6 w-full pb-8">
 			{/* Page Header */}
-			<header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-brand-surface border border-brand-border rounded-3xl p-6">
+			<header class="flex flex-col m-6 md:flex-row md:items-center md:justify-between gap-4 bg-brand-surface border border-brand-border rounded-3xl p-6">
 				<div>
 					<h1 class="text-2xl font-bold text-slate-100">Incidents</h1>
 					<p class="text-sm text-accent mt-1">Detection history & review log</p>
@@ -155,7 +155,7 @@ export function Incidents() {
 			</header>
 
 			{/* Search input bar */}
-			<div class="relative w-full max-w-md">
+			<div class="relative w-full max-w-md mt-0 m-6">
 				<input
 					type="text"
 					placeholder="Search cameras or zones..."
@@ -171,7 +171,7 @@ export function Incidents() {
 			</div>
 
 			{/* Incidents Table Panel */}
-			<section class="bg-brand-surface border border-brand-border rounded-3xl p-6 overflow-hidden">
+			<section class="bg-brand-surface m-6 mt-0 border border-brand-border rounded-3xl p-6 overflow-hidden">
 				<div class="overflow-x-auto">
 					<table class="w-full text-left border-collapse">
 						<thead>
@@ -224,13 +224,12 @@ export function Incidents() {
 												<select
 													value={incident.action}
 													onChange={(e) => handleActionChange(idx, (e.target as HTMLSelectElement).value as Incident['action'])}
-													class={`appearance-none font-bold text-xs pl-3.5 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer border transition-all ${
-														incident.action === 'Unresolved'
-															? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
-															: incident.action === 'In Progress'
+													class={`appearance-none font-bold text-xs pl-3.5 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer border transition-all ${incident.action === 'Unresolved'
+														? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
+														: incident.action === 'In Progress'
 															? 'bg-sky-500/10 border-sky-500/20 text-sky-400 hover:bg-sky-500/20'
 															: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
-													}`}
+														}`}
 												>
 													<option value="Unresolved" class="bg-brand-surface text-slate-300">Unresolved</option>
 													<option value="In Progress" class="bg-brand-surface text-slate-300">In Progress</option>
@@ -274,33 +273,30 @@ export function Incidents() {
 						{/* Number indicators */}
 						<button
 							type="button"
-							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${
-								currentPage === 1
-									? 'bg-accent/10 border-accent/20 text-accent font-bold shadow-[0_0_8px_rgba(20,184,166,0.1)]'
-									: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-							}`}
+							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${currentPage === 1
+								? 'bg-accent/10 border-accent/20 text-accent font-bold shadow-[0_0_8px_rgba(20,184,166,0.1)]'
+								: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
+								}`}
 							onClick={() => setCurrentPage(1)}
 						>
 							1
 						</button>
 						<button
 							type="button"
-							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${
-								currentPage === 2
-									? 'bg-accent/10 border-accent/20 text-accent font-bold'
-									: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-							}`}
+							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${currentPage === 2
+								? 'bg-accent/10 border-accent/20 text-accent font-bold'
+								: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
+								}`}
 							onClick={() => setCurrentPage(2)}
 						>
 							2
 						</button>
 						<button
 							type="button"
-							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${
-								currentPage === 3
-									? 'bg-accent/10 border-accent/20 text-accent font-bold'
-									: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
-							}`}
+							class={`w-8 h-8 rounded-lg font-mono text-center flex items-center justify-center border transition-all ${currentPage === 3
+								? 'bg-accent/10 border-accent/20 text-accent font-bold'
+								: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
+								}`}
 							onClick={() => setCurrentPage(3)}
 						>
 							3
