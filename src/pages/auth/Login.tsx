@@ -15,26 +15,26 @@ export function Login({ onNavigate }: Props) {
 	}
 
 	return (
-		<section class="w-full bg-brand-surface border border-brand-border rounded-3xl p-8 backdrop-blur-md shadow-2xl relative">
+		<section class="w-[450px] bg-[#21262D]/50 border border-brand-border rounded-3xl p-8 backdrop-blur-md shadow-2xl shadow-black relative mt-5">
 			{/* Brand Logo & Name */}
-			<div class="flex items-center gap-3 mb-8">
-				<img src="/logo.png" alt="FiremeX" class="w-10 h-10 object-contain rounded-xl" />
+			<div class="flex justify-center items-center gap-3 mb-10">
+				<img src="/logo.png" alt="FiremeX" class="w-12 h-12 object-contain border-2 border-[#8B949E]/40 rounded-xl bg-[#14B8A6]/10 pb-1" />
 				<div class="flex flex-col leading-none">
-					<span class="text-lg font-bold text-slate-100 tracking-tight">FiremeX</span>
-					<span class="text-[10px] text-slate-400 mt-1 uppercase tracking-wider">Fire & Security Monitoring</span>
+					<span class="text-lg font-bold text-slate-100 tracking-tight">Fireme<span class="text-accent">X</span></span>
+					<span class="text-[10px] text-[#8B949E] mt-1 tracking-wider">Fire & Security Monitoring</span>
 				</div>
 			</div>
 
 			{/* Form Header */}
-			<div class="mb-6">
-				<h1 class="text-2xl font-bold text-slate-100">Sign in</h1>
-				<p class="text-sm text-slate-400 mt-1">Operator & administrator access</p>
+			<div class="pl-4 mb-9">
+				<h1 class="text-[18px] font-semi-bold text-slate-100">Sign in</h1>
+				<p class="text-[14px] text-slate-400 mt-1">Operator & administrator access</p>
 			</div>
 
 			{/* Form */}
 			<form onSubmit={handleSubmit} class="flex flex-col gap-5">
 				{/* Email */}
-				<div class="flex flex-col gap-2">
+				<div class="flex flex-col gap-2 mb-2">
 					<label htmlFor="email" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
 						Email address
 					</label>
@@ -43,20 +43,20 @@ export function Login({ onNavigate }: Props) {
 						type="email"
 						value={email}
 						onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
-						class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3.5 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all placeholder-slate-600"
+						class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3.5 text-sm text-[#6B7280] focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all placeholder-slate-600"
 						required
 					/>
 				</div>
 
 				{/* Password */}
-				<div class="flex flex-col gap-2">
+				<div class="flex flex-col gap-2 mb-2">
 					<div class="flex items-center justify-between">
-						<label htmlFor="password" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+						<label htmlFor="password" class="text-xs font-semibold text-slate-400 uppercase tracking-wider ">
 							Password
 						</label>
 						<button
 							type="button"
-							class="text-xs font-semibold text-accent hover:text-accent-hover transition-colors"
+							class="text-xs text-accent hover:text-accent-hover transition-colors"
 							onClick={() => alert('Reset password link sent to email.')}
 						>
 							Forgot password?
@@ -68,7 +68,7 @@ export function Login({ onNavigate }: Props) {
 							type={showPassword ? 'text' : 'password'}
 							value={password}
 							onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
-							class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl pl-4 pr-11 py-3.5 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
+							class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl pl-4 pr-11 py-3.5 text-sm text-[#6B7280] focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
 							required
 						/>
 						{/* Eye toggle icon */}
@@ -91,7 +91,8 @@ export function Login({ onNavigate }: Props) {
 					</div>
 				</div>
 
-				{/* Remember me (subtle) */}
+				{/** 
+				 Remember me (subtle) 
 				<div class="flex items-center gap-2 mt-1">
 					<input
 						id="remember"
@@ -103,11 +104,12 @@ export function Login({ onNavigate }: Props) {
 						Keep me signed in on this device
 					</label>
 				</div>
+				*/}
 
 				{/* Sign in Button */}
 				<button
 					type="submit"
-					class="w-full mt-4 bg-accent hover:bg-accent-hover text-brand-bg font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-accent/20 hover:shadow-accent/30 transition-all duration-200"
+					class="w-full mt-4 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-3.5 px-4 rounded-xl shadow-lg transition-all duration-200"
 				>
 					Sign in
 				</button>

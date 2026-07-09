@@ -32,7 +32,7 @@ export function Dashboard({ onNavigate }: Props) {
 	return (
 		<div class="flex flex-col gap-6 w-full pb-8">
 			{/* Page Header */}
-			<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-brand-surface border border-brand-border rounded-3xl p-6">
+			<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0 bg-brand-surface border-b border-[#8B949E]/10 p-6">
 				<div>
 					<h1 class="text-2xl font-bold text-slate-100">Dashboard</h1>
 					<p class="text-sm text-accent mt-1">Real-time situation overview</p>
@@ -63,7 +63,7 @@ export function Dashboard({ onNavigate }: Props) {
 			</header>
 
 			{/* Stats Grid */}
-			<section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+			<section class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 p-t-3">
 				{/* Stats Card 1 */}
 				<div
 					class="bg-brand-surface border border-brand-border rounded-3xl p-6 flex justify-between items-start cursor-pointer hover:border-slate-800 transition-colors"
@@ -130,7 +130,7 @@ export function Dashboard({ onNavigate }: Props) {
 			</section>
 
 			{/* Recent Incidents Panel */}
-			<section class="bg-brand-surface border border-brand-border rounded-3xl p-6">
+			<section class="bg-brand-surface border border-brand-border rounded-3xl p-6 mt-0 m-6">
 				<div class="flex items-center justify-between mb-4">
 					<div class="flex items-center gap-2">
 						<h2 class="text-lg font-bold text-slate-100">Recent Incidents</h2>
@@ -193,7 +193,7 @@ export function Dashboard({ onNavigate }: Props) {
 			</section>
 
 			{/* Recent Alert Camera Preview Panel */}
-			<section class="bg-brand-surface border border-brand-border rounded-3xl p-6">
+			<section class="bg-brand-surface border border-brand-border rounded-3xl p-6 m-6">
 				<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
 					<div class="flex flex-wrap items-center gap-3">
 						<h2 class="text-lg font-bold text-slate-100">Recent Alert Camera Preview</h2>
@@ -245,7 +245,7 @@ export function Dashboard({ onNavigate }: Props) {
 
 					{/* Interactive HTML Bounding Box Overlay for Safety Incident */}
 					{/* Based on the generated fire coordinates on the lower middle area */}
-					<div 
+					<div
 						class="absolute bottom-[20%] left-[38%] w-[22%] h-[45%] border-2 border-red-500 bg-red-500/10 rounded-lg shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-[pulse_1.5s_ease-in-out_infinite]"
 						style={{ animationDelay: '0.2s' }}
 					>
@@ -254,7 +254,7 @@ export function Dashboard({ onNavigate }: Props) {
 							FIRE - 0.94
 						</div>
 					</div>
-					
+
 					{/* Ambient Alert Glow Overlay */}
 					<div class="absolute inset-0 border border-red-500/20 pointer-events-none rounded-2xl shadow-[inset_0_0_60px_rgba(239,68,68,0.15)] animate-pulse" />
 				</div>

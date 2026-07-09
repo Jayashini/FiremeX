@@ -9,7 +9,7 @@ type Props = {
 
 export function AdminLayout({ children, activePage, onNavigate }: Props) {
 	return (
-		<div class="min-h-screen grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 p-6 bg-brand-bg text-slate-200">
+		<div class="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-0 p-0 bg-brand-bg text-slate-200">
 			<AdminSidebar activePage={activePage} onNavigate={onNavigate} />
 			<main class="flex flex-col gap-6 overflow-y-auto">
 				{children}
