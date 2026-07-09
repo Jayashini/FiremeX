@@ -1,33 +1,13 @@
-:root {
-  --bg: #081013;
-  --bg-alt: #0e171b;
-  --surface: rgba(11, 19, 23, 0.92);
-  --surface-strong: #111c21;
-  --panel: #0f171b;
-  --border: rgba(148, 163, 184, 0.12);
-  --border-strong: rgba(20, 184, 166, 0.35);
-  --text: #c5d0d5;
-  --text-strong: #f1f7f7;
-  --muted: #7d8b91;
-  --accent: #14b8a6;
-  --accent-soft: rgba(20, 184, 166, 0.12);
-  --success: #33d17a;
-  --warning: #eab308;
-  --danger: #ef4444;
-  --shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
-  --font-body: Inter, 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Segoe UI', Inter, system-ui, sans-serif;
+@import "tailwindcss";
 
-  font: 16px/1.5 var(--font-body);
-  color: var(--text);
-  background:
-    radial-gradient(circle at top, rgba(20, 184, 166, 0.18), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(20, 184, 166, 0.1), transparent 25%),
-    linear-gradient(180deg, #060b0d, var(--bg));
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme {
+  --color-accent: #14B8A6;
+  --color-accent-hover: #0d9488;
+  --color-accent-soft: rgba(20, 184, 166, 0.1);
+  --color-brand-bg: #060B0D;
+  --color-brand-surface: #0C1316;
+  --color-brand-border: #172427;
+  --color-brand-card: #0E171A;
 }
 
 * {
@@ -38,21 +18,57 @@ html,
 body,
 #app {
   min-height: 100%;
+  background-color: #060B0D;
+  color: #E2E8F0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(20, 184, 166, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(20, 184, 166, 0.08) 0%, transparent 45%),
+    linear-gradient(180deg, #060B0D 0%, #0A1012 100%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
 }
 
-button,
-input {
-  font: inherit;
+/* Custom Webkit scrollbars for premium dark feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-button {
-  cursor: pointer;
+::-webkit-scrollbar-track {
+  background: #060B0D;
 }
 
-a {
-  color: inherit;
+::-webkit-scrollbar-thumb {
+  background: #172427;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #14B8A6;
+}
+
+/* Custom styling for blink animations used in alert states */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
