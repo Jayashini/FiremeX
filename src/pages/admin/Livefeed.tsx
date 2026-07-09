@@ -84,7 +84,7 @@ export function Livefeed({ onNavigate }: Props) {
 	return (
 		<div class="flex flex-col gap-6 w-full pb-8">
 			{/* Page Header */}
-			<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-brand-surface border border-brand-border rounded-3xl p-6">
+			<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0 bg-brand-surface border-b border-[#8B949E]/10 p-6">
 				<div>
 					<h1 class="text-2xl font-bold text-slate-100">Live Feed</h1>
 					<p class="text-sm text-accent mt-1">{cameras.length} cameras streaming | 1 critical detection</p>
@@ -115,7 +115,7 @@ export function Livefeed({ onNavigate }: Props) {
 			</header>
 
 			{/* Secondary Controls Header */}
-			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 m-6">
 				<div class="flex items-center gap-2">
 					<span class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Camera Grid</span>
 					<span class="text-xs text-slate-600">|</span>
@@ -128,22 +128,20 @@ export function Livefeed({ onNavigate }: Props) {
 						<span class="text-slate-500 px-2 select-none">Layout</span>
 						<button
 							type="button"
-							class={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-								layout === '2x2'
-									? 'bg-slate-200 text-brand-bg shadow'
-									: 'text-slate-400 hover:text-slate-200'
-							}`}
+							class={`px-3 py-1.5 rounded-lg font-semibold transition-all ${layout === '2x2'
+								? 'bg-slate-200 text-brand-bg shadow'
+								: 'text-slate-400 hover:text-slate-200'
+								}`}
 							onClick={() => setLayout('2x2')}
 						>
 							2 × 2
 						</button>
 						<button
 							type="button"
-							class={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-								layout === '1x2'
-									? 'bg-slate-200 text-brand-bg shadow'
-									: 'text-slate-400 hover:text-slate-200'
-							}`}
+							class={`px-3 py-1.5 rounded-lg font-semibold transition-all ${layout === '1x2'
+								? 'bg-slate-200 text-brand-bg shadow'
+								: 'text-slate-400 hover:text-slate-200'
+								}`}
 							onClick={() => setLayout('1x2')}
 						>
 							1 × 2
@@ -153,7 +151,7 @@ export function Livefeed({ onNavigate }: Props) {
 					{/* Add Camera Button */}
 					<button
 						type="button"
-						class="flex items-center gap-2 bg-accent hover:bg-accent-hover text-brand-bg font-bold text-xs px-4 py-3 rounded-xl transition-all shadow-md shadow-accent/10"
+						class="flex items-center gap-2 bg-accent/10 border border-accent hover:border-accent/40 text-accent font-bold text-xs px-4 py-3 rounded-md transition-all shadow-md shadow-accent/20"
 						onClick={handleAddCamera}
 					>
 						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -166,22 +164,20 @@ export function Livefeed({ onNavigate }: Props) {
 
 			{/* Camera Grid Layout */}
 			<section
-				class={`grid gap-6 transition-all duration-300 ${
-					layout === '2x2'
-						? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
-						: 'grid-cols-1 md:grid-cols-2'
-				}`}
+				class={`grid gap-6 transition-all duration-300 m-6 mt-0 ${layout === '2x2'
+					? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+					: 'grid-cols-1 md:grid-cols-2'
+					}`}
 			>
 				{cameras.map((camera) => {
 					const isCritical = camera.status === 'Critical'
 					return (
 						<article
 							key={camera.id}
-							class={`flex flex-col gap-4 bg-brand-surface border rounded-3xl p-5 transition-all ${
-								isCritical
-									? 'border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)] animate-pulse-ring'
-									: 'border-brand-border hover:border-slate-800'
-							}`}
+							class={`flex flex-col gap-4 bg-brand-surface border rounded-3xl p-5 transition-all ${isCritical
+								? 'border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)] animate-pulse-ring'
+								: 'border-brand-border hover:border-slate-800'
+								}`}
 						>
 							{/* Card Title Line */}
 							<div class="flex items-center justify-between">

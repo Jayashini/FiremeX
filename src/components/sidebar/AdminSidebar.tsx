@@ -1,5 +1,5 @@
 type Props = {
-	activePage: 'dashboard' | 'livefeed' | 'incidents' | 'alerts' | 'users' | 'cameras' | 'settings'
+	activePage: 'dashboard' | 'livefeed' | 'incidents' | 'alerts' | 'users' | 'settings'
 	onNavigate: (path: string) => void
 }
 
@@ -58,17 +58,6 @@ const items: SidebarItem[] = [
 		icon: (active: boolean) => (
 			<svg class={`w-5 h-5 transition-colors ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-			</svg>
-		)
-	},
-	{
-		label: 'Cameras',
-		path: '/admin/cameras',
-		key: 'cameras',
-		icon: (active: boolean) => (
-			<svg class={`w-5 h-6 transition-colors ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-				<circle cx="12" cy="12" r="3" />
-				<path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
 			</svg>
 		)
 	},
