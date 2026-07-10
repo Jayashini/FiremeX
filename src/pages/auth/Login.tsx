@@ -5,13 +5,37 @@ type Props = {
 }
 
 export function Login({ onNavigate }: Props) {
+	const [isRegistering, setIsRegistering] = useState(false)
 	const [email, setEmail] = useState('operator@gmail.com')
 	const [password, setPassword] = useState('operator12345')
+	const [name, setName] = useState('')
 	const [showPassword, setShowPassword] = useState(false)
 
 	const handleSubmit = (e: Event) => {
 		e.preventDefault()
-		onNavigate('/admin/dashboard')
+		if (isRegistering) {
+			// Save registration request to localStorage
+			const savedPending = localStorage.getItem('firemex_pending_users')
+			const pending = savedPending ? JSON.parse(savedPending) : [
+				{ id: 'usr-101', name: 'Bob Johnson', email: 'bob@gmail.com', role: 'Operator', date: '2026-07-09' },
+				{ id: 'usr-102', name: 'Alice Williams', email: 'alice@gmail.com', role: 'Operator', date: '2026-07-10' }
+			]
+			const newRequest = {
+				id: `usr-${Date.now()}`,
+				name,
+				email,
+				role: 'Operator',
+				date: new Date().toISOString().split('T')[0]
+			}
+			localStorage.setItem('firemex_pending_users', JSON.stringify([...pending, newRequest]))
+			alert('Access request submitted successfully! Pending administrator approval.')
+			setIsRegistering(false)
+			setName('')
+			setEmail('operator@gmail.com')
+			setPassword('operator12345')
+		} else {
+			onNavigate('/admin/dashboard')
+		}
 	}
 
 	return (
@@ -27,12 +51,34 @@ export function Login({ onNavigate }: Props) {
 
 			{/* Form Header */}
 			<div class="pl-2 mb-9">
-				<h1 class="text-[16px] font-semi-bold text-slate-100">Login in</h1>
-				<p class="text-[12px] text-slate-400">Operator & administrator access</p>
+				<h1 class="text-[16px] font-semibold text-slate-100">
+					{isRegistering ? 'Request Access' : 'Login in'}
+				</h1>
+				<p class="text-[12px] text-[#8B949E]">
+					{isRegistering ? 'Submit a request to join the operator team' : 'Operator & administrator access'}
+				</p>
 			</div>
 
 			{/* Form */}
 			<form onSubmit={handleSubmit} class="flex flex-col gap-5">
+				{/* Full Name (Only when registering) */}
+				{isRegistering && (
+					<div class="flex flex-col gap-2 mb-2">
+						<label htmlFor="name" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+							Full Name
+						</label>
+						<input
+							id="name"
+							type="text"
+							placeholder="John Doe"
+							value={name}
+							onInput={(e) => setName((e.target as HTMLInputElement).value)}
+							class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
+							required
+						/>
+					</div>
+				)}
+
 				{/* Email */}
 				<div class="flex flex-col gap-2 mb-2">
 					<label htmlFor="email" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -43,7 +89,7 @@ export function Login({ onNavigate }: Props) {
 						type="email"
 						value={email}
 						onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
-						class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3.5 text-sm text-[#6B7280] focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all placeholder-slate-600"
+						class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
 						required
 					/>
 				</div>
@@ -51,16 +97,18 @@ export function Login({ onNavigate }: Props) {
 				{/* Password */}
 				<div class="flex flex-col gap-2 mb-2">
 					<div class="flex items-center justify-between">
-						<label htmlFor="password" class="text-xs font-semibold text-slate-400 uppercase tracking-wider ">
+						<label htmlFor="password" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
 							Password
 						</label>
-						<button
-							type="button"
-							class="text-xs text-accent hover:text-accent-hover transition-colors"
-							onClick={() => alert('Reset password link sent to email.')}
-						>
-							Forgot password?
-						</button>
+						{!isRegistering && (
+							<button
+								type="button"
+								class="text-xs text-accent hover:text-accent-hover transition-colors"
+								onClick={() => alert('Reset password link sent to email.')}
+							>
+								Forgot password?
+							</button>
+						)}
 					</div>
 					<div class="relative w-full">
 						<input
@@ -68,10 +116,9 @@ export function Login({ onNavigate }: Props) {
 							type={showPassword ? 'text' : 'password'}
 							value={password}
 							onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
-							class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl pl-4 pr-11 py-3.5 text-sm text-[#6B7280] focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
+							class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl pl-4 pr-11 py-3.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
 							required
 						/>
-						{/* Eye toggle icon */}
 						<button
 							type="button"
 							class="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-500 hover:text-slate-300 transition-colors"
@@ -91,29 +138,35 @@ export function Login({ onNavigate }: Props) {
 					</div>
 				</div>
 
-				{/** 
-				 Remember me (subtle) 
-				<div class="flex items-center gap-2 mt-1">
-					<input
-						id="remember"
-						type="checkbox"
-						defaultChecked
-						class="w-4 h-4 bg-transparent rounded border-brand-border text-accent focus:ring-accent focus:ring-offset-0 focus:ring-offset-transparent cursor-pointer"
-					/>
-					<label htmlFor="remember" class="text-xs text-slate-400 select-none cursor-pointer">
-						Keep me signed in on this device
-					</label>
-				</div>
-				*/}
-
-				{/* Sign in Button */}
+				{/* Submit Button */}
 				<button
 					type="submit"
 					class="w-full mt-4 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-3.5 px-4 rounded-xl shadow-lg transition-all duration-200"
 				>
-					Sign in
+					{isRegistering ? 'Submit Request' : 'Sign in'}
 				</button>
 			</form>
+
+			{/* Toggle view link */}
+			<div class="mt-8 text-center">
+				{isRegistering ? (
+					<button
+						type="button"
+						class="text-xs text-accent hover:underline"
+						onClick={() => setIsRegistering(false)}
+					>
+						Already have an account? Sign in
+					</button>
+				) : (
+					<button
+						type="button"
+						class="text-xs text-accent hover:underline"
+						onClick={() => setIsRegistering(true)}
+					>
+						Don't have an account? Request access
+					</button>
+				)}
+			</div>
 		</section>
 	)
 }

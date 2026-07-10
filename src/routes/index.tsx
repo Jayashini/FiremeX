@@ -7,6 +7,7 @@ import { Incidents } from '../pages/admin/Incidents'
 import { Alerts } from '../pages/admin/Alerts'
 import { Livefeed } from '../pages/admin/Livefeed'
 import { AddDevice } from '../pages/admin/AddDevice'
+import { User } from '../pages/admin/User'
 
 export function AppRoutes() {
 	const [path, setPath] = useState(() => normalizePath(window.location.pathname))
@@ -73,9 +74,17 @@ export function AppRoutes() {
 		)
 	}
 
+	if (path === '/admin/users') {
+		return (
+			<AdminLayout activePage="users" onNavigate={navigate}>
+				<User />
+			</AdminLayout>
+		)
+	}
+
 	// Placeholders for sidebar items
-	if (path === '/admin/users' || path === '/admin/cameras' || path === '/admin/settings') {
-		const key = path.split('/').pop() as 'users' | 'cameras' | 'settings'
+	if (path === '/admin/cameras' || path === '/admin/settings') {
+		const key = path.split('/').pop() as 'cameras' | 'settings'
 		return (
 			<AdminLayout activePage={key} onNavigate={navigate}>
 				<div class="flex flex-col items-center justify-center min-h-[50vh] text-slate-400">

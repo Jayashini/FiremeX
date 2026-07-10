@@ -96,10 +96,10 @@ export function Alerts() {
 	return (
 		<div class="flex flex-col gap-6 w-full pb-8">
 			{/* Page Header */}
-			<header class="flex flex-col m-6 md:flex-row md:items-center md:justify-between gap-4 bg-brand-surface border border-brand-border rounded-3xl p-6">
+			<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0 bg-brand-surface border-b border-[#8B949E]/10 p-4 pl-10">
 				<div>
 					<h1 class="text-2xl font-bold text-slate-100">Alert History</h1>
-					<p class="text-sm text-accent mt-1">Notification dispatch & acknowledgement audit</p>
+					<p class="text-sm text-[#8B949E] mt-1">Notification dispatch & acknowledgement audit</p>
 				</div>
 
 				{/* Header Actions */}
@@ -109,7 +109,7 @@ export function Alerts() {
 						<select
 							value={timeFilter}
 							onChange={(e) => setTimeFilter((e.target as HTMLSelectElement).value)}
-							class="appearance-none bg-brand-surface border border-brand-border hover:border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-300 font-semibold focus:outline-none cursor-pointer"
+							class="appearance-none bg-brand-surface border border-brand-border hover:border-slate-800 rounded-xl pl-9 pr-8 py-3 text-xs text-slate-300 font-semibold focus:outline-none cursor-pointer"
 						>
 							<option>Last 7 Days</option>
 							<option>Last 30 Days</option>
@@ -130,7 +130,7 @@ export function Alerts() {
 						<select
 							value={channelFilter}
 							onChange={(e) => setChannelFilter((e.target as HTMLSelectElement).value)}
-							class="appearance-none bg-brand-surface border border-brand-border hover:border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-300 font-semibold focus:outline-none cursor-pointer"
+							class="appearance-none bg-brand-surface border border-brand-border hover:border-slate-800 rounded-xl pl-9 pr-8 py-3 text-xs text-slate-300 font-semibold focus:outline-none cursor-pointer"
 						>
 							<option value="All channels">All channels</option>
 							<option value="SMS">SMS</option>
