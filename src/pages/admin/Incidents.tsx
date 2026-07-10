@@ -9,6 +9,8 @@ type Incident = {
 	status: string
 	statusColor: 'red' | 'orange' | 'green'
 	action: 'Unresolved' | 'In Progress' | 'Resolved'
+	resolveNote?: string
+	blockerReason?: string
 }
 
 const initialIncidents: Incident[] = [
@@ -57,6 +59,12 @@ export function Incidents() {
 	const [statusFilter, setStatusFilter] = useState('All')
 	const [currentPage, setCurrentPage] = useState(1)
 
+	// Modal States
+	const [resolvingIncident, setResolvingIncident] = useState<Incident | null>(null)
+	const [resolveNote, setResolveNote] = useState('')
+	const [unableToResolve, setUnableToResolve] = useState(false)
+	const [blockerReason, setBlockerReason] = useState('')
+
 	// Filter logic
 	const filteredIncidents = incidents.filter((incident) => {
 		const matchesSearch =
@@ -73,10 +81,67 @@ export function Incidents() {
 		return matchesSearch && matchesCamera && matchesStatus
 	})
 
-	const handleActionChange = (index: number, newAction: Incident['action']) => {
-		const updated = [...incidents]
-		updated[index].action = newAction
+	const handleActionChange = (incident: Incident, newAction: Incident['action']) => {
+		if (newAction === 'Resolved') {
+			setResolvingIncident(incident)
+			setResolveNote(incident.resolveNote || '')
+			setUnableToResolve(!!incident.blockerReason)
+			setBlockerReason(incident.blockerReason || '')
+		} else {
+			const updated = incidents.map(inc => {
+				if (inc.timestamp === incident.timestamp && inc.camera === incident.camera) {
+					return {
+						...inc,
+						action: newAction,
+						statusColor: newAction === 'Unresolved' ? 'red' : 'orange',
+						resolveNote: undefined,
+						blockerReason: undefined
+					} as Incident
+				}
+				return inc
+			})
+			setIncidents(updated)
+		}
+	}
+
+	const handleConfirmResolve = (e: any) => {
+		e.preventDefault()
+		if (!resolvingIncident) return
+
+		const updated = incidents.map(inc => {
+			if (inc.timestamp === resolvingIncident.timestamp && inc.camera === resolvingIncident.camera) {
+				return {
+					...inc,
+					action: 'Resolved',
+					statusColor: 'green',
+					resolveNote: resolveNote,
+					blockerReason: undefined
+				} as Incident
+			}
+			return inc
+		})
 		setIncidents(updated)
+		setResolvingIncident(null)
+	}
+
+	const handleSaveBlocker = (e: any) => {
+		e.preventDefault()
+		if (!resolvingIncident) return
+
+		const updated = incidents.map(inc => {
+			if (inc.timestamp === resolvingIncident.timestamp && inc.camera === resolvingIncident.camera) {
+				return {
+					...inc,
+					action: 'Unresolved',
+					statusColor: 'red',
+					resolveNote: undefined,
+					blockerReason: blockerReason
+				} as Incident
+			}
+			return inc
+		})
+		setIncidents(updated)
+		setResolvingIncident(null)
 	}
 
 	return (
@@ -155,7 +220,7 @@ export function Incidents() {
 			</header>
 
 			{/* Search input bar */}
-			<div class="relative w-full max-w-md mt-0 m-6">
+			<div class="relative w-full max-w-md mt-3 m-4 mx-90">
 				<input
 					type="text"
 					placeholder="Search cameras or zones..."
@@ -217,13 +282,23 @@ export function Incidents() {
 													{incident.status}
 												</span>
 											)}
+											{incident.resolveNote && (
+												<span class="block text-[11px] text-slate-400 mt-1 font-sans">
+													Note: {incident.resolveNote}
+												</span>
+											)}
+											{incident.blockerReason && (
+												<span class="block text-[11px] text-red-400 mt-1 font-sans">
+													Blocked: {incident.blockerReason}
+												</span>
+											)}
 										</td>
 										<td class="py-4 px-4">
 											{/* Actions dropdown box */}
 											<div class="relative inline-block text-left">
 												<select
 													value={incident.action}
-													onChange={(e) => handleActionChange(idx, (e.target as HTMLSelectElement).value as Incident['action'])}
+													onChange={(e) => handleActionChange(incident, (e.target as HTMLSelectElement).value as Incident['action'])}
 													class={`appearance-none font-bold text-xs pl-3.5 pr-8 py-2 rounded-xl focus:outline-none cursor-pointer border transition-all ${incident.action === 'Unresolved'
 														? 'bg-amber-500/10 border-amber-500/20 text-amber-500 hover:bg-amber-500/20'
 														: incident.action === 'In Progress'
@@ -323,6 +398,92 @@ export function Incidents() {
 					</div>
 				</div>
 			</section>
+
+			{/* Resolution Modal */}
+			{resolvingIncident && (
+				<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+					<div class="w-full max-w-lg bg-[#0B1315]/95 border border-[#8B949E]/10 rounded-3xl p-6 shadow-2xl">
+						<h2 class="text-xl font-bold text-slate-100 mb-2">Resolve Incident</h2>
+						<p class="text-xs text-slate-400 mb-6">Update the resolution status for <span class="font-mono text-accent">{resolvingIncident.camera}</span> ({resolvingIncident.timestamp})</p>
+
+						<div class="flex flex-col gap-4">
+							{/* Checkbox: Unable to resolve */}
+							<label class="flex items-start gap-3 cursor-pointer group">
+								<input
+									type="checkbox"
+									checked={unableToResolve}
+									onChange={(e: any) => setUnableToResolve(e.target.checked)}
+									class="mt-1 w-4 h-4 bg-[#050B0D] rounded border-[#8B949E]/20 text-accent focus:ring-accent focus:ring-offset-0 focus:ring-offset-transparent cursor-pointer"
+								/>
+								<div class="flex flex-col select-none">
+									<span class="text-sm font-semibold text-slate-200 group-hover:text-slate-100">Unable to resolve this incident</span>
+									<span class="text-xs text-slate-500 mt-0.5">Check this if there is a reason preventing resolution</span>
+								</div>
+							</label>
+
+							{unableToResolve ? (
+								/* blockerReason textarea */
+								<div class="flex flex-col gap-2">
+									<label class="text-xs font-mono text-slate-400">Reason for being unable to resolve</label>
+									<textarea
+										required
+										placeholder="Explain why this incident cannot be resolved..."
+										value={blockerReason}
+										onInput={(e: any) => setBlockerReason(e.target.value)}
+										class="w-full bg-[#050B0D] border border-[#8B949E]/20 focus:border-red-500 text-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors h-24 resize-none"
+									/>
+									<span class="text-xs text-red-400 font-semibold mt-1">⚠️ Notice: The status will not be updated to Resolved.</span>
+								</div>
+							) : (
+								/* resolveNote textarea */
+								<div class="flex flex-col gap-2">
+									<label class="text-xs font-mono text-slate-400">Resolve Note</label>
+									<textarea
+										required
+										placeholder="Describe how this incident was resolved..."
+										value={resolveNote}
+										onInput={(e: any) => setResolveNote(e.target.value)}
+										class="w-full bg-[#050B0D] border border-[#8B949E]/20 focus:border-accent text-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors h-24 resize-none"
+									/>
+								</div>
+							)}
+						</div>
+
+						{/* Footer buttons */}
+						<div class="flex items-center justify-between mt-8 border-t border-[#8B949E]/10 pt-4">
+							<button
+								type="button"
+								onClick={() => setResolvingIncident(null)}
+								class="text-sm font-mono text-slate-400 hover:text-slate-200 transition-colors"
+							>
+								Cancel
+							</button>
+
+							{unableToResolve ? (
+								<button
+									type="button"
+									onClick={handleSaveBlocker}
+									disabled={!blockerReason}
+									class={`flex items-center gap-2 bg-red-600/10 border border-red-500/30 hover:border-red-500 text-red-400 font-mono font-bold text-xs px-5 py-2.5 rounded-xl transition-all ${!blockerReason ? 'opacity-50 cursor-not-allowed' : ''
+										}`}
+								>
+									Save Note
+								</button>
+							) : (
+								<button
+									type="button"
+									onClick={handleConfirmResolve}
+									disabled={!resolveNote}
+									class={`flex items-center gap-2 bg-accent hover:bg-accent/90 text-brand-bg font-mono font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-md shadow-accent/20 ${!resolveNote ? 'opacity-50 cursor-not-allowed' : ''
+										}`}
+								>
+									Mark as Resolved
+								</button>
+							)}
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	)
 }
