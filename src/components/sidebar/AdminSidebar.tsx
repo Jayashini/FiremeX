@@ -88,7 +88,7 @@ export function AdminSidebar({ activePage, onNavigate }: Props) {
 				</div>
 
 				{/* Nav List */}
-				<nav class="flex flex-col gap-2">
+				<nav class="flex flex-col gap-2 mt-0">
 					{items.map((item) => {
 						const active = activePage === item.key
 						return (
@@ -96,7 +96,7 @@ export function AdminSidebar({ activePage, onNavigate }: Props) {
 								key={item.key}
 								type="button"
 								class={`group flex items-center gap-3 w-full px-4 py-3 rounded-xl border text-left text-sm font-medium transition-all ${active
-									? 'bg-[#050B0D]/80 border-l-5 border-accent text-accent border-shadow-none'
+									? 'bg-accent/7 border-l-4 border-accent text-accent border-y-transparent border-r-transparent'
 									: 'bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/20'
 									}`}
 								onClick={() => onNavigate(item.path)}

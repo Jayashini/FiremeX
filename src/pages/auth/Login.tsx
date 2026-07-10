@@ -26,9 +26,9 @@ export function Login({ onNavigate }: Props) {
 			</div>
 
 			{/* Form Header */}
-			<div class="pl-4 mb-9">
-				<h1 class="text-[18px] font-semi-bold text-slate-100">Sign in</h1>
-				<p class="text-[14px] text-slate-400 mt-1">Operator & administrator access</p>
+			<div class="pl-2 mb-9">
+				<h1 class="text-[16px] font-semi-bold text-slate-100">Login in</h1>
+				<p class="text-[12px] text-slate-400">Operator & administrator access</p>
 			</div>
 
 			{/* Form */}

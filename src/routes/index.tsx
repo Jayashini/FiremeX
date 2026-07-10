@@ -6,6 +6,7 @@ import { Dashboard } from '../pages/admin/Dashboard'
 import { Incidents } from '../pages/admin/Incidents'
 import { Alerts } from '../pages/admin/Alerts'
 import { Livefeed } from '../pages/admin/Livefeed'
+import { AddDevice } from '../pages/admin/AddDevice'
 
 export function AppRoutes() {
 	const [path, setPath] = useState(() => normalizePath(window.location.pathname))
@@ -60,6 +61,14 @@ export function AppRoutes() {
 		return (
 			<AdminLayout activePage="livefeed" onNavigate={navigate}>
 				<Livefeed onNavigate={navigate} />
+			</AdminLayout>
+		)
+	}
+
+	if (path === '/admin/livefeed/add-device') {
+		return (
+			<AdminLayout activePage="livefeed" onNavigate={navigate}>
+				<AddDevice onNavigate={navigate} />
 			</AdminLayout>
 		)
 	}
