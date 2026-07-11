@@ -149,23 +149,13 @@ export function Login({ onNavigate }: Props) {
 
 			{/* Toggle view link */}
 			<div class="mt-8 text-center">
-				{isRegistering ? (
-					<button
-						type="button"
-						class="text-xs text-accent hover:underline"
-						onClick={() => setIsRegistering(false)}
-					>
-						Already have an account? Sign in
-					</button>
-				) : (
-					<button
-						type="button"
-						class="text-xs text-accent hover:underline"
-						onClick={() => setIsRegistering(true)}
-					>
-						Don't have an account? Request access
-					</button>
-				)}
+				<button
+					type="button"
+					class="text-xs text-accent hover:underline"
+					onClick={() => onNavigate('/FiremeX/register')}
+				>
+					Don't have an account? Request access / Register Organization
+				</button>
 			</div>
 		</section>
 	)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { AuthLayout } from '../layouts/AuthLayout'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { Login } from '../pages/auth/Login'
+import { RegisterGateway } from '../pages/auth/RegisterGateway'
 import { Dashboard } from '../pages/admin/Dashboard'
 import { Incidents } from '../pages/admin/Incidents'
 import { Alerts } from '../pages/admin/Alerts'
@@ -24,6 +25,14 @@ export function AppRoutes() {
 			window.history.pushState({}, '', normalized)
 			setPath(normalized)
 		}
+	}
+
+	if (path === '/FiremeX/register') {
+		return (
+			<AuthLayout maxWidthClassName="max-w-[800px]">
+				<RegisterGateway onNavigate={navigate} />
+			</AuthLayout>
+		)
 	}
 
 	if (path === '/login' || path === '/') {
