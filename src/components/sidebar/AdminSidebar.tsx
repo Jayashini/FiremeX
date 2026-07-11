@@ -13,7 +13,7 @@ type SidebarItem = {
 const items: SidebarItem[] = [
 	{
 		label: 'Dashboard',
-		path: '/admin/dashboard',
+		path: '/FiremeX/admin/dashboard',
 		key: 'dashboard',
 		icon: (active: boolean) => (
 			<svg class={`w-5 h-6 transition-colors ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -23,7 +23,7 @@ const items: SidebarItem[] = [
 	},
 	{
 		label: 'Live Feed',
-		path: '/admin/livefeed',
+		path: '/FiremeX/admin/livefeed',
 		key: 'livefeed',
 		icon: (active: boolean) => (
 			<svg class={`w-6 h-6 transition-colors ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -33,7 +33,7 @@ const items: SidebarItem[] = [
 	},
 	{
 		label: 'Incidents',
-		path: '/admin/incidents',
+		path: '/FiremeX/admin/incidents',
 		key: 'incidents',
 		icon: (active: boolean) => (
 			<svg class={`w-6 h-6 transition-colors ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -43,7 +43,7 @@ const items: SidebarItem[] = [
 	},
 	{
 		label: 'Alerts',
-		path: '/admin/alerts',
+		path: '/FiremeX/admin/alerts',
 		key: 'alerts',
 		icon: (active: boolean) => (
 			<svg class={`w- h-6 transition-colors ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -53,7 +53,7 @@ const items: SidebarItem[] = [
 	},
 	{
 		label: 'Users',
-		path: '/admin/users',
+		path: '/FiremeX/admin/users',
 		key: 'users',
 		icon: (active: boolean) => (
 			<svg class={`w-5 h-5 transition-colors ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -63,7 +63,7 @@ const items: SidebarItem[] = [
 	},
 	{
 		label: 'Settings',
-		path: '/admin/settings',
+		path: '/FiremeX/admin/settings',
 		key: 'settings',
 		icon: (active: boolean) => (
 			<svg class={`w-5 h-6 transition-colors ${active ? 'text-accent' : 'text-slate-400 group-hover:text-slate-200'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

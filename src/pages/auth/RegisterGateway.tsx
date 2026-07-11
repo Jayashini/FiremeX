@@ -157,7 +157,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 					<div class="mt-8 text-center border-t border-brand-border/40 pt-5">
 						<button
 							type="button"
-							onClick={() => onNavigate('/login')}
+							onClick={() => onNavigate('/FiremeX/login')}
 							class="text-xs text-[#8B949E] hover:text-accent hover:underline transition-colors"
 						>
 							Already have an account? Sign in

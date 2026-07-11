@@ -35,7 +35,7 @@ export function AppRoutes() {
 		)
 	}
 
-	if (path === '/login' || path === '/') {
+	if (path === '/FiremeX/login' || path === '/') {
 		return (
 			<AuthLayout>
 				<Login onNavigate={navigate} />
@@ -43,7 +43,7 @@ export function AppRoutes() {
 		)
 	}
 
-	if (path === '/admin/dashboard' || path === '/admin') {
+	if (path === '/FiremeX/admin/dashboard') {
 		return (
 			<AdminLayout activePage="dashboard" onNavigate={navigate}>
 				<Dashboard onNavigate={navigate} />
@@ -51,7 +51,7 @@ export function AppRoutes() {
 		)
 	}
 
-	if (path === '/admin/incidents') {
+	if (path === '/FiremeX/admin/incidents') {
 		return (
 			<AdminLayout activePage="incidents" onNavigate={navigate}>
 				<Incidents />
@@ -59,7 +59,7 @@ export function AppRoutes() {
 		)
 	}
 
-	if (path === '/admin/alerts') {
+	if (path === '/FiremeX/admin/alerts') {
 		return (
 			<AdminLayout activePage="alerts" onNavigate={navigate}>
 				<Alerts />
@@ -67,7 +67,7 @@ export function AppRoutes() {
 		)
 	}
 
-	if (path === '/admin/livefeed') {
+	if (path === '/FiremeX/admin/livefeed') {
 		return (
 			<AdminLayout activePage="livefeed" onNavigate={navigate}>
 				<Livefeed onNavigate={navigate} />
@@ -75,7 +75,7 @@ export function AppRoutes() {
 		)
 	}
 
-	if (path === '/admin/livefeed/add-device') {
+	if (path === '/FiremeX/admin/livefeed/add-device') {
 		return (
 			<AdminLayout activePage="livefeed" onNavigate={navigate}>
 				<AddDevice onNavigate={navigate} />
@@ -83,7 +83,7 @@ export function AppRoutes() {
 		)
 	}
 
-	if (path === '/admin/users') {
+	if (path === '/FiremeX/admin/users') {
 		return (
 			<AdminLayout activePage="users" onNavigate={navigate}>
 				<User />
@@ -92,7 +92,7 @@ export function AppRoutes() {
 	}
 
 	// Placeholders for sidebar items
-	if (path === '/admin/cameras' || path === '/admin/settings') {
+	if (path === '/FiremeX/admin/cameras' || path === '/FiremeX/admin/settings') {
 		const key = path.split('/').pop() as 'cameras' | 'settings'
 		return (
 			<AdminLayout activePage={key} onNavigate={navigate}>

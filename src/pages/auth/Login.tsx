@@ -34,7 +34,7 @@ export function Login({ onNavigate }: Props) {
 			setEmail('operator@gmail.com')
 			setPassword('operator12345')
 		} else {
-			onNavigate('/admin/dashboard')
+			onNavigate('/FiremeX/admin/dashboard')
 		}
 	}
 
