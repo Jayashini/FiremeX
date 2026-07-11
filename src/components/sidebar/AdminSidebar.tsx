@@ -88,7 +88,7 @@ export function AdminSidebar({ activePage, onNavigate }: Props) {
 				</div>
 
 				{/* Nav List */}
-				<nav class="flex flex-col gap-2 mt-0">
+				<nav class="flex flex-col gap-2 mt-[-20px]">
 					{items.map((item) => {
 						const active = activePage === item.key
 						return (

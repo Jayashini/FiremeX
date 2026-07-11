@@ -103,7 +103,7 @@ export function Livefeed({ onNavigate }: Props) {
 					<button
 						type="button"
 						class="relative flex items-center justify-center w-10 h-10 bg-brand-surface border border-brand-border hover:border-accent/40 rounded-xl text-slate-400 hover:text-slate-200 transition-colors"
-						onClick={() => onNavigate('/admin/alerts')}
+						onClick={() => onNavigate('/FiremeX/admin/alerts')}
 					>
 						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -153,7 +153,7 @@ export function Livefeed({ onNavigate }: Props) {
 					<button
 						type="button"
 						class="flex items-center gap-2 bg-accent/10 border border-accent hover:border-accent/40 text-accent font-bold text-xs px-4 py-3 rounded-md transition-all shadow-md shadow-accent/20"
-						onClick={() => onNavigate('/admin/livefeed/add-device')}
+						onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
 					>
 						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -302,11 +302,12 @@ export function Livefeed({ onNavigate }: Props) {
 				<button
 					type="button"
 					class="flex flex-col items-center justify-center gap-3 bg-accent/5 hover:bg-accent/10 border border-dashed border-accent/30 hover:border-accent/50 rounded-3xl p-8 min-h-[310px] text-center transition-all duration-300"
-					onClick={() => onNavigate('/admin/livefeed/add-device')}
+					onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
 				>
 					<div class="p-4 bg-[#050B0D] border border-accent/20 rounded-2xl text-accent shadow-md">
-						<svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+						<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
 						</svg>
 					</div>
 					<div>

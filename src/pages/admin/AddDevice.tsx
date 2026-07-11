@@ -228,7 +228,7 @@ export function AddDevice({ onNavigate }: Props) {
 					<div class="flex items-center justify-between">
 						<button
 							type="button"
-							onClick={() => onNavigate('/admin/livefeed')}
+							onClick={() => onNavigate('/FiremeX/admin/livefeed')}
 							class="text-sm font-mono text-slate-400 hover:text-slate-200 transition-colors"
 						>
 							Cancel
