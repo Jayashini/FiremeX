@@ -1,5 +1,5 @@
 type Props = {
-	activePage: 'dashboard' | 'livefeed' | 'incidents' | 'alerts' | 'users' | 'settings'
+	activePage: 'dashboard' | 'livefeed' | 'incidents' | 'alerts' | 'users' | 'settings' | 'cameras'
 	onNavigate: (path: string) => void
 }
 

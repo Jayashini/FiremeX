@@ -4,7 +4,7 @@ import { Footer } from '../components/common/Footer'
 
 type Props = {
 	children: ComponentChildren
-	activePage: 'dashboard' | 'livefeed' | 'incidents' | 'alerts' | 'users' | 'settings'
+	activePage: 'dashboard' | 'livefeed' | 'incidents' | 'alerts' | 'users' | 'settings' | 'cameras'
 	onNavigate: (path: string) => void
 }
 
