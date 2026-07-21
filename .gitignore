@@ -22,3 +22,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Home Assistant runtime files (never commit credentials or databases)
+homeassistant_config/.storage/
+homeassistant_config/.cloud/
+homeassistant_config/.cache/
+homeassistant_config/deps/
+homeassistant_config/tts/
+homeassistant_config/blueprints/
+homeassistant_config/.ha_run.lock
+homeassistant_config/.HA_VERSION
+homeassistant_config/*.db*
+homeassistant_config/*.log*
+
+# Converted proposal text (original .docx is the source of truth)
+ProjectProposal.txt
