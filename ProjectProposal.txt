@@ -1,0 +1,327 @@
+
+INDUSTRY PROJECT PROPOSAL
+Complete all sections in full.  Maximum submission: 5 pages (excluding this cover).
+
+A. PROJECT IDENTIFICATION
+A1.  Project Title
+FiremeX: An AI powered software-based fire detection system for CCTV platforms.
+
+A2.  Project Track  (tick one)
+	•	  UCSC Track (UT)
+Industry / open-source topic via UGVLE
+☐  Industry Track (IT)
+PDC-registered company project
+☐  Startup Track (ST)
+Student-founded registered startup
+
+A3.  Project Type  (tick one)
+	•	  Software Product
+Web / mobile / desktop application
+☐  Proof of Concept (PoC)
+Research-based prototype / algorithm
+
+B. GROUP & SUPERVISORY DETAILS
+B1.  Student Group
+#
+Full Name
+Registration No.
+Degree
+Email
+1
+T.G.M. Nishnatha
+23001275
+	•	 CS  ☐ IS
+malikanishnatha4@gmail.com
+2
+L.D.S.S.Jayasinghe
+23000732
+	•	CS  ☐ IS
+sahansandaruwan2003@gmail.com 
+3
+E. H. Epa
+23020237
+	•	IS  ☐ CS
+esanduepa0225@gmail.com 
+4
+G.P.G.T.D.Hapugoda
+23020301
+	•	IS  ☐ CS
+thiekshanaha@gmail.com
+5
+M.A.J.C.S.Jayaweera
+23020431
+	•	IS  ☐ CS
+jayashinisjayaweera@gmail.com
+ℹ  Recommended composition: at least 2 CS students and 2 IS students per group.
+
+B2.  Academic Co-Supervisor (UCSC)
+Name: Mr. Amod Pathirana
+B3.  Industry Mentor / Company
+Name & Organisation: 
+Mr. Suvin Kodituwakku
+WSO2 
+C. PROJECT OVERVIEW
+C1.  Problem Statement
+ℹ  Describe the real-world problem or gap this project addresses. (≈ 100 words)
+Traditional safety monitoring methods often depend on human operators to monitor CCTV footage and manually react to abnormal situations. This process is time consuming and is subjected to human errors. It could lead to delayed detection of dangerous events, increasing the risk of injuries, environmental damage, loss of equipment and operational disruptions. 
+Standalone sensors can detect changes in the environment, but lack visual context, leading to false alarms; sensors require clear data to meet its high thresholds for confident readings. This accumulated heat alters the sensor's environment and can negatively affect the accuracy of the readings. 
+
+C2.  Proposed Solution & Objectives
+ℹ  Summarise the software solution and list 3–5 measurable project objectives.
+AI-powered CCTV-based Security Monitoring System that combines computer vision, environmental sensors, real-time risk assessment, automated alerts to fire, improve workplace safety, enhance incident response. 
+
+C3.  Key Features / Modules
+#
+Feature / Module
+Brief Description
+Primary ILO(s)
+1
+Real-Time CCTV Monitoring
+The system receives live video streams from CCTV cameras and processes them.
+
+2
+AI-Based fire Detection 
+Artificial Intelligence models analyze video frames to identify fire flames(with their color).
+
+3
+Intelligent Risk Assessment 
+The system combines CCTV analysis and sensor readings to reduce false alarms and improve decision-making. 
+
+4
+Automated Alert System 
+When fire is detected, the system immediately notifies responsible personnel. 
+
+5
+Centralized Dashboard 
+Operators have the option to monitor all activities (Live CCTV feeds ,Detection results ,Incident logs ,Alert history ) from a single interface without deviating from existing practices. 
+
+6
+Security Monitoring and Access Control 
+Only authorized users can access system resources and surveillance data. 
+
+ℹ  List the main features students will individually build. Features/functions of third-party libraries cannot be claimed as contribution.
+D. TECHNICAL APPROACH
+D1.  Technology Stack
+Layer
+Technology / Framework
+Justification
+Frontend / UI
+Preact.js
+Its component based architecture simplifies development & maintenance. Preact.js is Lightweight alternative to React.js
+Middleware
+Python
+It provides a simple, powerful, and efficient interface for integrating multiple components of the system, including CCTV video processing, AI models, etc.
+Backend / API
+Go
+Easy to integrate & efficient handling of  real-time requests from cameras.
+
+JWT Authentication 
+Provides secure user authentication and role-based access control for administrators and operators using short-lived self-container access tokens.
+Database
+PostgreSQL
+Provides reliable storage & ensures data integrity & scalability.
+DevOps / Deployment
+Version Control - GitHub
+Can source code management, collaboration, version tracking, and continuous development. 
+
+Containerization - Docker 
+Ensure consistent deployment across development and production environments. 
+
+Deployments in a VPS
+Hosting AI applications and backend services. 
+Other (e.g. ML, IoT)
+OpenCV 
+Used for image processing, frame extraction, and video stream handling from CCTV cameras. 
+
+YOLO 
+Fast and accurate real-time object detection for identifying people, smoke, vapor clouds. 
+
+D2.  System Architecture Overview
+ℹ  Provide a high-level architecture diagram or a textual description of how system components interact.
+https://drive.google.com/file/d/1YVkJ-4W3kYb49lT_zU96jMArj1LOx914/view?usp=sharing 
+E. PROJECT PLAN & WORKLOAD DISTRIBUTION
+E1.  High-Level Timeline (2 Semesters)
+Phase
+Milestone / Deliverable
+Target Week(s)
+Responsible Member(s)
+1
+Identifying the problem and requirement analysis
+4 weeks
+All Members 
+2
+System design, DB design, ER diagram, Dashboard design, risk assessment
+5 - 9 weeks 
+All Members 
+3
+Develop environment setup, backend API, frontend development, AI Model Research and Dataset Preparation & model development, finally system integration
+10 - 21 weeks
+All Members 
+4
+Unit test, AI model accuracy, user acceptance testing
+22 - 26 weeks
+All Members 
+5
+Dockerization & deployment preparation, validation & deployment 
+27 - 28 weeks
+All Members 
+6
+Final technical documentation
+29th week
+All Members 
+7
+Final Presentation, Demonstration, and Project Submission 
+30th week
+All Members 
+ℹ  Semester 1 ≈ Weeks 1–15; Semester 2 ≈ Weeks 16–30. Include Proposal, Interim, and Final milestones.
+
+E2.  Individual Contribution Plan
+Student Name
+Primary Responsibilities
+Contribution Area
+Est. Hours
+Theekshana
+Project planning, requirements engineering, documentation, risk management, and project coordination 
+	•	Both ☐ SE   ☐ BA
+420 hrs
+Sahan
+Frontend design and development, dashboard implementation, UI testing, and API integration 
+	•	SE   ☐ BA   ☐ Both
+430 hrs
+Esandu
+Backend development, database integration, authentication, business logic, and system integration 
+	•	SE   ☐ BA   ☐ Both
+450 hrs
+Malika
+AI/ML model development, computer vision implementation, model training, testing, and optimization 
+	•	 SE   ☐ BA   ☐ Both
+440hrs
+Jayashini
+Quality assurance, security testing, deployment, DevOps activities, monitoring, and performance testing 
+	•	Both ☐ SE   ☐ BA 
+420hrs
+ℹ  SE = Software Engineering  |  BA = Business Analysis. Each student must contribute ≥ 400 hours across both semesters.
+F. INTENDED LEARNING OUTCOME ALIGNMENT
+Tick each ILO that is directly addressed by this project and briefly explain how in the space provided.
+ILO
+Description
+Status
+ILO-01
+Synthesise project requirements into structured execution plans with defined milestones and task distribution.
+[ ] Addressed
+ILO-02
+Build functional, scalable software by applying engineering principles, modern frameworks, and deployment strategies.
+[ ] Addressed
+ILO-03
+Validate software integrity through rigorous testing and maintain industry-standard technical documentation and version control.
+[ ] Addressed
+ILO-04
+Demonstrate professional communication and effective teamwork to achieve project objectives.
+[ ] Addressed
+ILO-05
+Resolve complex technical challenges through research and critical thinking while reflecting on professional growth.
+[ ] Addressed
+
+Brief explanation of ILO coverage:
+For each ticked ILO, state which feature, activity, or artefact will demonstrate it.
+ILO 
+Explanation of Coverage
+ILO 01
+Tasks and responsibilities assigned among team members to ensure systematic project execution. The project requirements were structured & project plan consist with system modules
+ILO 02
+Modern technologies will be used for this project(Preact.js, Go, PostgreSQL, OpenCV, YOLO, Docker)
+ILO 03 
+System functionality is validated through unit testing, integration testing, and user acceptance testing. 
+Version control is managed using Git and GitHub 
+ILO 04 
+Team members collaborate through task allocation, regular meetings, progress tracking, and technical discussions. Professional communication is demonstrated through project reports, presentations, and documentation.
+ILO 05 
+The project involves AI-based computer vision, chemical hazard monitoring, Challenges in real-time detection accuracy, system security, and performance optimization are addressed through critical analysis and experimentation.
+
+G. RISKS, CONSTRAINTS & ASSUMPTIONS
+#
+Risk / Constraint
+Likelihood (H/M/L)
+Mitigation Strategy
+1
+Cyber security threats 
+M
+Implement strong authentication, role-based access control and force users to update defaults and to rotate credentials.
+2
+AI can make mistakes
+H
+Use larger, well-annotated datasets for training, manual evaluations of false positives, Use AI Red Teaming to simulate and patch any issues that may come from the trained model. 
+3
+Vendors resist to get third-party monitoring solution
+M
+Provide integration support, ensure compatibility with existing CCTV infrastructure, and cost savings. FiremeX should be just an add-on that provides value and should not alter or change existing workflows.
+
+H. TRACK-SPECIFIC DECLARATIONS
+ℹ  Complete only the sub-section relevant to your selected track (A2 above). Leave others blank.
+H1.  UCSC Track (UT)
+UGVLE Topic Reference No. : Group 21
+
+Mentor Name & Organisation: 
+
+Mr. Suvin Kodituwakku 
+WSO2 
+
+H2.  Industry Track (IT)
+Company Name:
+
+PDC Registration No.:
+
+Agreement Signed? ☐ Yes ☐ No
+
+
+H3.  Startup Track (ST)
+Registered Company Name:
+
+PDC Registration No.:
+
+Founding Member(s) in Group?  ☐ Yes
+
+
+I. DECLARATIONS & SIGNATURES
+We confirm that the information provided is accurate, that this project is a genuine software development initiative, and that we have read and agree to the Industry Project terms and conditions.
+#
+Student Name
+Signature
+Date
+1
+Malika Nishnatha
+
+03/05/2026
+2
+Sahan Jayasinghe
+
+03/05/2026
+3
+Esandu Epa
+
+03/05/2026
+
+4
+Theekshana Hapugoda
+
+03/05/2026
+5
+Jayashini Jayaweera 
+
+03/05/2026
+
+
+Academic Co-Supervisor Name:
+
+Signature & Date:
+
+AMOD PATHIRANA
+
+06/04/2026
+Industry Mentor / Supervisor Name:
+SUVIN KODITUWAKKU
+Signature & Date: 
+
+06/03/2026
+
+Submit via UGVLE before the published deadline.  Late submissions will not be accepted.
