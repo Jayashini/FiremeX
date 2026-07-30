@@ -8,3 +8,20 @@ services:
     restart: unless-stopped
     ports:
       - "8123:8123"
+
+  # --- POSTGRES DATABASE ---
+  db:
+    container_name: firemex_db
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: firemex
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
