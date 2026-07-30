@@ -37,3 +37,25 @@ homeassistant_config/*.log*
 
 # Converted proposal text (original .docx is the source of truth)
 ProjectProposal.txt
+
+
+# --- Go specific ---
+# Compiled Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Built executable for Mac/Linux
+backend/main
+backend/backend
+
+# Test binaries
+*.test
+
+# Go coverage output
+*.out
+
+# Dependency directory (if you ever vendor dependencies)
+vendor/
