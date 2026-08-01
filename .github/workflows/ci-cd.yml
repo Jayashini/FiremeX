@@ -1,0 +1,69 @@
+# Name of the GitHub Actions workflow
+name: FiremeX CI/CD Pipeline
+
+# Defines the trigger events for this workflow
+on:
+  # Trigger when a commit is pushed to the main or master branches
+  push:
+    branches: [ main, master ]
+  # Trigger when a pull request is opened or updated targeting main or master
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+
+  # Job 1: Build & Validate the Frontend
+  frontend-ci:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout the git repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Node.js runtime environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # Step 3: Clean install project dependencies
+      - name: Install Frontend Dependencies
+        run: npm ci
+        working-directory: ./frontend
+
+      # Step 4: Run typechecks (TypeScript) and build the Vite project
+      - name: Build Frontend (Typecheck & Compile)
+        run: npm run build
+        working-directory: ./frontend
+
+
+  # Job 2: Build & Validate the Go Backend
+
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout the git repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up the Go environment
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      # Step 3: Download Go dependencies defined in go.mod
+      - name: Install Go Dependencies
+        run: go mod download
+        working-directory: ./backend
+
+      # Step 4: Compile/build the Go application
+      - name: Build Go Backend
+        run: go build -o main .
+        working-directory: ./backend
