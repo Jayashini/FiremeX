@@ -9,6 +9,7 @@ import (
 	"github.com/firemex/backend/database"
 	"github.com/firemex/backend/middleware"
 	"github.com/firemex/backend/models"
+	"github.com/gin-contrib/cors"
 )
 
 func main() {
@@ -25,6 +26,14 @@ func main() {
 
 	// 3. Initialize the Gin web framework
 	router := gin.Default()
+
+	// 3.1 CORS Configuration
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+	}))
 
 	// 4. Test Route
 	router.GET("/ping", func(c *gin.Context) {
