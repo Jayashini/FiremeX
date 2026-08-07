@@ -17,96 +17,100 @@ type RequestDetail = {
     date: string
 }
 
-const defaultActiveUsers: UserDetail[] = [
-    {
-        id: 'usr-01',
-        name: 'John Doe',
-        email: 'operator@gmail.com',
-        role: 'Operator',
-        status: 'Active',
-        date: '2026-06-01'
-    },
-    {
-        id: 'usr-02',
-        name: 'Jane Smith',
-        email: 'jane@gmail.com',
-        role: 'Operator',
-        status: 'Active',
-        date: '2026-06-15'
-    },
-    {
-        id: 'usr-03',
-        name: 'J. Silva',
-        email: 'jsilva@firemex.com',
-        role: 'Administrator',
-        status: 'Active',
-        date: '2026-05-10'
-    }
-]
-
-const defaultPendingRequests: RequestDetail[] = [
-    {
-        id: 'usr-101',
-        name: 'Bob Johnson',
-        email: 'bob@gmail.com',
-        role: 'Operator',
-        date: '2026-07-09'
-    },
-    {
-        id: 'usr-102',
-        name: 'Alice Williams',
-        email: 'alice@gmail.com',
-        role: 'Operator',
-        date: '2026-07-10'
-    }
-]
-
 export function User() {
-    const [activeUsers, setActiveUsers] = useState<UserDetail[]>(() => {
-        const saved = localStorage.getItem('firemex_active_users')
-        return saved ? JSON.parse(saved) : defaultActiveUsers
-    })
-
-    const [pendingRequests, setPendingRequests] = useState<RequestDetail[]>(() => {
-        const saved = localStorage.getItem('firemex_pending_users')
-        return saved ? JSON.parse(saved) : defaultPendingRequests
-    })
-
+    const [activeUsers, setActiveUsers] = useState<UserDetail[]>([])
+    const [pendingRequests, setPendingRequests] = useState<RequestDetail[]>([])
     const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active')
+    const [loading, setLoading] = useState(true)
 
-    // Persist active users
-    useEffect(() => {
-        localStorage.setItem('firemex_active_users', JSON.stringify(activeUsers))
-    }, [activeUsers])
+    const token = localStorage.getItem('firemex_token')
 
-    // Persist pending requests
+    // Helper function to get auth headers
+    const authHeaders = () => ({
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    })
+
+    // Fetch all users from the backend
+    const fetchUsers = async () => {
+        try {
+            const response = await fetch('http://localhost:8080/api/users', {
+                headers: authHeaders()
+            })
+            const data = await response.json()
+            if (response.ok) {
+                setActiveUsers(data.active?.map((u: any) => ({
+                    id: String(u.ID),
+                    name: u.name,
+                    email: u.email,
+                    role: u.role,
+                    status: u.status,
+                    date: u.CreatedAt?.split('T')[0] || ''
+                })) || [])
+                setPendingRequests(data.pending?.map((u: any) => ({
+                    id: String(u.ID),
+                    name: u.name,
+                    email: u.email,
+                    role: u.role,
+                    date: u.CreatedAt?.split('T')[0] || ''
+                })) || [])
+            }
+        } catch (err) {
+            console.error('Failed to fetch users:', err)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // Load users on mount
     useEffect(() => {
-        localStorage.setItem('firemex_pending_users', JSON.stringify(pendingRequests))
-    }, [pendingRequests])
+        fetchUsers()
+    }, [])
 
     // Approve request handler
-    const handleApprove = (req: RequestDetail) => {
-        const newUser: UserDetail = {
-            id: req.id,
-            name: req.name,
-            email: req.email,
-            role: req.role,
-            status: 'Active',
-            date: new Date().toISOString().split('T')[0]
+    const handleApprove = async (req: RequestDetail) => {
+        try {
+            const response = await fetch(`http://localhost:8080/api/users/${req.id}/approve`, {
+                method: 'PATCH',
+                headers: authHeaders()
+            })
+            if (response.ok) {
+                fetchUsers() // Refresh the list from the backend
+            }
+        } catch (err) {
+            console.error('Failed to approve user:', err)
         }
-        setActiveUsers([...activeUsers, newUser])
-        setPendingRequests(pendingRequests.filter((r) => r.id !== req.id))
     }
 
     // Deny request handler
-    const handleDeny = (id: string) => {
-        setPendingRequests(pendingRequests.filter((r) => r.id !== id))
+    const handleDeny = async (id: string) => {
+        try {
+            const response = await fetch(`http://localhost:8080/api/users/${id}/deny`, {
+                method: 'DELETE',
+                headers: authHeaders()
+            })
+            if (response.ok) {
+                fetchUsers() // Refresh the list from the backend
+            }
+        } catch (err) {
+            console.error('Failed to deny user:', err)
+        }
     }
 
     // Revoke active user handler
-    const handleRevoke = (id: string) => {
+    const handleRevoke = async (id: string) => {
         if (confirm('Are you sure you want to revoke access for this user?')) {
-            setActiveUsers(activeUsers.filter((u) => u.id !== id))
+            try {
+                const response = await fetch(`http://localhost:8080/api/users/${id}/revoke`, {
+                    method: 'PATCH',
+                    headers: authHeaders()
+                })
+                if (response.ok) {
+                    fetchUsers() // Refresh the list from the backend
+                }
+            } catch (err) {
+                console.error('Failed to revoke user:', err)
+            }
         }
     }
 
@@ -130,7 +134,7 @@ export function User() {
                         : 'text-slate-400 hover:text-slate-200'
                         }`}
                 >
-                    Active Operators ({activeUsers.filter(u => u.role === 'Operator').length})
+                    Active Operators ({activeUsers.filter(u => u.role === 'operator' || u.role === 'Operator').length})
                 </button>
                 <button
                     type="button"
@@ -146,12 +150,16 @@ export function User() {
 
             {/* Tab Content */}
             <div class="mx-10 mt-2">
-                {activeTab === 'active' ? (
+                {loading ? (
+                    <div class="flex justify-center items-center py-12 text-slate-400">
+                        <span class="text-sm">Loading users from server...</span>
+                    </div>
+                ) : activeTab === 'active' ? (
                     <div>
                         {/* Grid Layout for Active Operators */}
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {activeUsers
-                                .filter((user) => user.role === 'Operator')
+                                .filter((user) => user.role === 'operator' || user.role === 'Operator')
                                 .map((user) => (
                                     <div
                                         key={user.id}
@@ -177,12 +185,12 @@ export function User() {
                                             <div>
                                                 <span class="text-slate-500 font-mono block mb-1">System Role</span>
                                                 <span class="inline-flex items-center gap-1 border border-accent/20 bg-accent/5 px-2 py-0.5 rounded text-[10px] font-bold text-accent uppercase tracking-wider">
-                                                    {user.role}
+                                                    {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                                                 </span>
                                             </div>
                                             <div>
                                                 <span class="text-slate-500 font-mono block mb-1">Status</span>
-                                                <span class="flex items-center gap-1.5 font-semibold text-emerald-400">
+                                                <span class="flex items-center gap-1.5 font-semibold text-emerald-400 capitalize">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                                                     {user.status}
                                                 </span>
@@ -208,7 +216,7 @@ export function User() {
                                 ))}
                         </div>
 
-                        {activeUsers.filter((user) => user.role === 'Operator').length === 0 && (
+                        {activeUsers.filter((user) => user.role === 'operator' || user.role === 'Operator').length === 0 && (
                             <div class="flex flex-col items-center justify-center p-12 bg-[#0B1315]/20 border border-dashed border-[#8B949E]/10 rounded-3xl text-center text-slate-500">
                                 <p class="font-semibold text-lg text-slate-400 mb-1">No Active Operators</p>
                                 <p class="text-sm">Approve new registration requests to add system operators.</p>
@@ -244,7 +252,7 @@ export function User() {
                                         <div>
                                             <span class="text-slate-500 font-mono block mb-1">Requested Role</span>
                                             <span class="inline-flex items-center gap-1 border border-amber-500/20 bg-amber-500/5 px-2 py-0.5 rounded text-[10px] font-bold text-amber-400 uppercase tracking-wider">
-                                                {req.role}
+                                                {req.role.charAt(0).toUpperCase() + req.role.slice(1)}
                                             </span>
                                         </div>
                                         <div>
