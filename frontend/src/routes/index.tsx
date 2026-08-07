@@ -43,6 +43,15 @@ export function AppRoutes() {
 		)
 	}
 
+	// ROUTE GUARD: If they are trying to access ANY admin page but aren't logged in,
+	// kick them back to the login page immediately.
+	if (path.startsWith('/FiremeX/admin/')) {
+		if (!isLoggedIn()) {
+			navigate('/FiremeX/login')
+			return null // Don't render anything while we redirect
+		}
+	}
+
 	if (path === '/FiremeX/admin/dashboard') {
 		return (
 			<AdminLayout activePage="dashboard" onNavigate={navigate}>
@@ -110,6 +119,11 @@ export function AppRoutes() {
 			<Login onNavigate={navigate} />
 		</AuthLayout>
 	)
+}
+
+
+function isLoggedIn() {
+	return !!localStorage.getItem('firemex_token')
 }
 
 function normalizePath(pathname: string) {

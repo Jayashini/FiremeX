@@ -10,11 +10,14 @@ export function Login({ onNavigate }: Props) {
 	const [password, setPassword] = useState('operator12345')
 	const [name, setName] = useState('')
 	const [showPassword, setShowPassword] = useState(false)
+	const [error, setError] = useState('')
 
-	const handleSubmit = (e: Event) => {
+		const handleSubmit = async (e: Event) => {
 		e.preventDefault()
+		setError('') // Clear any old errors
+
 		if (isRegistering) {
-			// Save registration request to localStorage
+			// Keep your old registration mockup code here
 			const savedPending = localStorage.getItem('firemex_pending_users')
 			const pending = savedPending ? JSON.parse(savedPending) : [
 				{ id: 'usr-101', name: 'Bob Johnson', email: 'bob@gmail.com', role: 'Operator', date: '2026-07-09' },
@@ -34,7 +37,30 @@ export function Login({ onNavigate }: Props) {
 			setEmail('operator@gmail.com')
 			setPassword('operator12345')
 		} else {
-			onNavigate('/FiremeX/admin/dashboard')
+			try {
+				// 1. Send the email and password to the Go backend
+				const response = await fetch('http://localhost:8080/login', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ email, password })
+				})
+
+				const data = await response.json()
+
+				// 2. If the backend says the password is wrong
+				if (!response.ok) {
+					setError(data.error || 'Login failed')
+					return
+				}
+
+				// 3. Success! Save the JWT token
+				localStorage.setItem('firemex_token', data.token)
+
+				// 4. Go to the dashboard
+				onNavigate('/FiremeX/admin/dashboard')
+			} catch (err) {
+				setError('Network error. Is the backend running?')
+			}
 		}
 	}
 
@@ -137,6 +163,8 @@ export function Login({ onNavigate }: Props) {
 						</button>
 					</div>
 				</div>
+
+			{error && ( <p class="text-sm font-semibold text-red-500 text-center mb-2 animate-pulse">{error}</p>)}
 
 				{/* Submit Button */}
 				<button
