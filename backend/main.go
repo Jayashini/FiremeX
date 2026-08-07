@@ -17,8 +17,8 @@ func main() {
 	log.Println("Starting FiremeX backend...")
 	database.ConnectDB()
 
-	// 2. Run the AutoMigrate
-	err := database.DB.AutoMigrate(&models.User{})
+	// 2. Run the AutoMigrate for all models
+	err := database.DB.AutoMigrate(&models.Organization{}, &models.User{})
 	if err != nil {
 		log.Fatal("Failed to migrate database: ", err)
 	}
@@ -40,15 +40,17 @@ func main() {
 		c.JSON(200, gin.H{"message": "pong! FiremeX API is running."})
 	})
 
-	// 5. Authentication Routes
-	router.POST("/register", controllers.Register)
+	// 5. Public Authentication Routes
 	router.POST("/login", controllers.Login)
+
+	// 5.1 Public Registration Routes
+	router.POST("/register/organization", controllers.RegisterOrganization)
+	router.POST("/register/operator", controllers.RegisterOperator)
 
 	// 6. Protected Routes (Require a valid JWT token)
 	protected := router.Group("/api")
-	protected.Use(middleware.RequireAuth) // Attach the Security Guard!
+	protected.Use(middleware.RequireAuth)
 	{
-		// This route is now protected!
 		protected.GET("/dashboard", func(c *gin.Context) {
 			userID, _ := c.Get("userID")
 			c.JSON(200, gin.H{
@@ -58,7 +60,17 @@ func main() {
 		})
 	}
 
-	// 7. Start the server
+	// 7. Admin-Only Routes (Require JWT + Admin role)
+	admin := protected.Group("/")
+	admin.Use(middleware.RequireAdmin)
+	{
+		admin.GET("/users", controllers.GetAllUsers)
+		admin.PATCH("/users/:id/approve", controllers.ApproveUser)
+		admin.DELETE("/users/:id/deny", controllers.DenyUser)
+		admin.PATCH("/users/:id/revoke", controllers.RevokeUser)
+	}
+
+	// 8. Start the server
 	log.Println("Server is running on port 8080...")
 	router.Run(":8080")
 }

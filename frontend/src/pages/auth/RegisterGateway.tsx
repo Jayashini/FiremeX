@@ -25,53 +25,77 @@ export function RegisterGateway({ onNavigate }: Props) {
 	const [orgCode, setOrgCode] = useState('')
 	const [accessReason, setAccessReason] = useState('')
 
-	const handleOrgSubmit = (e: Event) => {
+	const [error, setError] = useState('')
+	const [loading, setLoading] = useState(false)
+
+	const handleOrgSubmit = async (e: Event) => {
 		e.preventDefault()
-		// Save organization to localStorage
-		const savedOrgs = localStorage.getItem('firemex_organizations')
-		const orgs = savedOrgs ? JSON.parse(savedOrgs) : [
-			{ id: 'ORG-101', name: 'SafeGuard Industries', sector: 'Industrial', email: 'admin@safeguard.com' },
-			{ id: 'ORG-102', name: 'Metro Health Center', sector: 'Healthcare', email: 'admin@metrohealth.com' }
-		]
+		setError('')
+		setLoading(true)
 
-		const generatedCode = `ORG-${Math.floor(100 + Math.random() * 900)}`
-		const newOrg = {
-			id: generatedCode,
-			name: orgName,
-			sector: orgSector,
-			email: orgEmail,
-			adminName: orgAdminName,
-			phone: orgPhone,
-			date: new Date().toISOString().split('T')[0]
+		try {
+			const response = await fetch('http://localhost:8080/register/organization', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					org_name: orgName,
+					sector: orgSector,
+					email: orgEmail,
+					phone: orgPhone,
+					admin_name: orgAdminName,
+					password: orgPassword
+				})
+			})
+
+			const data = await response.json()
+
+			if (!response.ok) {
+				setError(data.error || 'Registration failed')
+				setLoading(false)
+				return
+			}
+
+			alert(`Organization "${orgName}" registered successfully!\nYour unique Organization Code is: ${data.org_code}\nOperators can use this code to join your team.`)
+			onNavigate('/FiremeX/login')
+		} catch (err) {
+			setError('Network error. Is the backend running?')
+		} finally {
+			setLoading(false)
 		}
-
-		localStorage.setItem('firemex_organizations', JSON.stringify([...orgs, newOrg]))
-		alert(`Organization "${orgName}" registered successfully!\nYour unique Organization Code is: ${generatedCode}\nOperators can use this code to join your team.`)
-		onNavigate('/login')
 	}
 
-	const handleOperatorSubmit = (e: Event) => {
+	const handleOperatorSubmit = async (e: Event) => {
 		e.preventDefault()
-		// Save pending operator request to localStorage
-		const savedPending = localStorage.getItem('firemex_pending_users')
-		const pending = savedPending ? JSON.parse(savedPending) : [
-			{ id: 'usr-101', name: 'Bob Johnson', email: 'bob@gmail.com', role: 'Operator', date: '2026-07-09', orgCode: 'ORG-101' },
-			{ id: 'usr-102', name: 'Alice Williams', email: 'alice@gmail.com', role: 'Operator', date: '2026-07-10', orgCode: 'ORG-102' }
-		]
+		setError('')
+		setLoading(true)
 
-		const newRequest = {
-			id: `usr-${Date.now()}`,
-			name: operatorName,
-			email: operatorEmail,
-			role: 'Operator',
-			orgCode: orgCode,
-			reason: accessReason,
-			date: new Date().toISOString().split('T')[0]
+		try {
+			const response = await fetch('http://localhost:8080/register/operator', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					name: operatorName,
+					email: operatorEmail,
+					password: operatorPassword,
+					org_code: orgCode
+				})
+			})
+
+			const data = await response.json()
+
+			if (!response.ok) {
+				setError(data.error || 'Registration failed')
+				setLoading(false)
+				return
+			}
+
+			alert('Operator access request submitted successfully! Pending approval from the organization administrator.')
+			onNavigate('/FiremeX/login')
+		} catch (err) {
+			setError('Network error. Is the backend running?')
+		} finally {
+			setLoading(false)
 		}
-
-		localStorage.setItem('firemex_pending_users', JSON.stringify([...pending, newRequest]))
-		alert('Operator access request submitted successfully! Pending approval from the organization administrator.')
-		onNavigate('/login')
 	}
 
 	return (
@@ -171,7 +195,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 					<div class="flex items-center gap-2 mb-6">
 						<button
 							type="button"
-							onClick={() => setStep('select')}
+							onClick={() => { setStep('select'); setError('') }}
 							class="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
 						>
 							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -283,11 +307,14 @@ export function RegisterGateway({ onNavigate }: Props) {
 							</div>
 						</div>
 
+						{error && <p class="text-sm font-semibold text-red-500 text-center mb-2 animate-pulse">{error}</p>}
+
 						<button
 							type="submit"
-							class="w-full mt-4 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-3 px-4 rounded-xl shadow-lg transition-all duration-200 text-xs"
+							disabled={loading}
+							class="w-full mt-4 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-3 px-4 rounded-xl shadow-lg transition-all duration-200 text-xs disabled:opacity-50"
 						>
-							Complete Registration
+							{loading ? 'Registering...' : 'Complete Registration'}
 						</button>
 					</form>
 				</section>
@@ -298,7 +325,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 					<div class="flex items-center gap-2 mb-6">
 						<button
 							type="button"
-							onClick={() => setStep('select')}
+							onClick={() => { setStep('select'); setError('') }}
 							class="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
 						>
 							<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -393,11 +420,14 @@ export function RegisterGateway({ onNavigate }: Props) {
 							/>
 						</div>
 
+						{error && <p class="text-sm font-semibold text-red-500 text-center mb-2 animate-pulse">{error}</p>}
+
 						<button
 							type="submit"
-							class="w-full mt-4 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-3 px-4 rounded-xl shadow-lg transition-all duration-200 text-xs"
+							disabled={loading}
+							class="w-full mt-4 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-3 px-4 rounded-xl shadow-lg transition-all duration-200 text-xs disabled:opacity-50"
 						>
-							Request Operators Access
+							{loading ? 'Requesting...' : 'Request Operators Access'}
 						</button>
 					</form>
 				</section>

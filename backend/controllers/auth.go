@@ -79,6 +79,16 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// 3.5 Check if the user's account is approved
+	if user.Status == "pending" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Your account is pending administrator approval"})
+		return
+	}
+	if user.Status == "revoked" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Your account access has been revoked"})
+		return
+	}
+
 	// 4. Create the JWT digital ticket
 	// We store their User ID and when the ticket expires (e.g., in 24 hours)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
