@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 
 	"github.com/firemex/backend/controllers"
 	"github.com/firemex/backend/database"
@@ -13,12 +14,17 @@ import (
 )
 
 func main() {
+	// 0. Load environment variables from .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("Note: .env file not found or failed to load. Using default environment variables.")
+	}
+
 	// 1. Connect to the Database
 	log.Println("Starting FiremeX backend...")
 	database.ConnectDB()
 
 	// 2. Run the AutoMigrate for all models
-	err := database.DB.AutoMigrate(&models.Organization{}, &models.User{})
+	err := database.DB.AutoMigrate(&models.Organization{}, &models.User{}, &models.Camera{})
 	if err != nil {
 		log.Fatal("Failed to migrate database: ", err)
 	}
@@ -58,6 +64,10 @@ func main() {
 				"userID":  userID,
 			})
 		})
+
+		// Camera routes for authenticated users
+		protected.GET("/cameras", controllers.GetCameras)
+		protected.GET("/cameras/stream/:entity_id", controllers.StreamCamera)
 	}
 
 	// 7. Admin-Only Routes (Require JWT + Admin role)
@@ -68,9 +78,15 @@ func main() {
 		admin.PATCH("/users/:id/approve", controllers.ApproveUser)
 		admin.DELETE("/users/:id/deny", controllers.DenyUser)
 		admin.PATCH("/users/:id/revoke", controllers.RevokeUser)
+
+		// Camera management routes for admins
+		admin.GET("/cameras/available", controllers.GetAvailableCameras)
+		admin.POST("/cameras", controllers.AddCamera)
+		admin.DELETE("/cameras/:id", controllers.DeleteCamera)
 	}
 
 	// 8. Start the server
 	log.Println("Server is running on port 8080...")
 	router.Run(":8080")
 }
+
