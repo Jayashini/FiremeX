@@ -7,59 +7,95 @@ type Props = {
 const initialCameras = [
 	{
 		id: 'CAM-01',
+		db_id: null,
 		name: 'CAM-01 Main Entrance',
 		zone: 'Warehouse A',
 		status: 'Normal',
 		ip: '192.168.1.101',
 		fps: '25 fps',
 		resolution: '1080p',
+		entity_id: 'camera.demo_camera',
 		time: '06-26 14:42:08'
 	},
 	{
 		id: 'CAM-02',
+		db_id: null,
 		name: 'CAM-02 Entrance',
 		zone: 'Warehouse A',
 		status: 'Critical',
 		ip: '192.168.1.102',
 		fps: '25 fps',
 		resolution: '1080p',
+		entity_id: null,
 		time: '06-26 14:42:08'
 	},
 	{
 		id: 'CAM-03',
+		db_id: null,
 		name: 'CAM-03 Entrance',
 		zone: 'Warehouse C',
 		status: 'Normal',
 		ip: '192.168.1.103',
 		fps: '20 fps',
 		resolution: '1080p',
+		entity_id: null,
 		time: '06-26 14:42:08'
 	},
 	{
 		id: 'CAM-04',
+		db_id: null,
 		name: 'CAM-02 Server Room North',
 		zone: 'Secure IT',
 		status: 'Normal',
 		ip: '192.168.1.104',
 		fps: '30 fps',
 		resolution: '1080p',
+		entity_id: null,
 		time: '06-26 14:42:08'
 	}
 ]
 
 export function Livefeed({ onNavigate }: Props) {
-	const [cameras, setCameras] = useState(() => {
-		const saved = localStorage.getItem('firemex_cameras')
-		return saved ? JSON.parse(saved) : initialCameras
-	})
+	const [cameras, setCameras] = useState<any[]>(initialCameras)
 	const [layout, setLayout] = useState<'2x2' | '1x2'>('2x2')
 	const [timeStr, setTimeStr] = useState('')
 
-	// Store default list in local storage if not already present
-	useEffect(() => {
-		if (!localStorage.getItem('firemex_cameras')) {
-			localStorage.setItem('firemex_cameras', JSON.stringify(initialCameras))
+	// Fetch real cameras from API
+	const fetchCameras = async () => {
+		try {
+			const token = localStorage.getItem('firemex_token')
+			if (!token) return
+
+			const res = await fetch('http://localhost:8080/api/cameras', {
+				headers: { Authorization: `Bearer ${token}` }
+			})
+
+			if (!res.ok) return
+			const data = await res.json()
+
+			if (data.cameras && data.cameras.length > 0) {
+				const mapped = data.cameras.map((c: any, index: number) => ({
+					id: `CAM-${String(index + 1).padStart(2, '0')}`,
+					db_id: c.ID,
+					name: c.display_name,
+					zone: c.zone || 'Default Zone',
+					status: 'Normal',
+					ip: c.entity_id,
+					fps: '30 fps',
+					resolution: '1080p',
+					entity_id: c.entity_id,
+					time: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }).replace(/\//g, '-') + ' ' + new Date().toLocaleTimeString('en-US', { hour12: false })
+				}))
+				setCameras(mapped)
+			}
+		} catch (err) {
+			console.error('Failed to fetch cameras from backend:', err)
 		}
+	}
+
+
+	useEffect(() => {
+		fetchCameras()
 	}, [])
 
 	// Real-time ticking clock for premium effect
@@ -76,10 +112,19 @@ export function Livefeed({ onNavigate }: Props) {
 		return () => clearInterval(interval)
 	}, [])
 
-	const handleDeleteCamera = (id: string) => {
-		const updated = cameras.filter((cam: any) => cam.id !== id)
-		setCameras(updated)
-		localStorage.setItem('firemex_cameras', JSON.stringify(updated))
+	const handleDeleteCamera = async (camera: any) => {
+		if (camera.db_id) {
+			try {
+				const token = localStorage.getItem('firemex_token')
+				await fetch(`http://localhost:8080/api/cameras/${camera.db_id}`, {
+					method: 'DELETE',
+					headers: { Authorization: `Bearer ${token}` }
+				})
+			} catch (err) {
+				console.error('Failed to delete camera:', err)
+			}
+		}
+		setCameras((prev) => prev.filter((c) => c.id !== camera.id))
 	}
 
 	return (
@@ -182,18 +227,33 @@ export function Livefeed({ onNavigate }: Props) {
 						>
 							{/* Video Frame Preview */}
 							<div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#050B0D] border border-[#8B949E]/10 flex items-center justify-center group">
+								{/* Live HA Stream or Fallback */}
+								{camera.entity_id ? (
+									<img
+										src={`http://localhost:8080/api/cameras/stream/${camera.entity_id}`}
+										alt={camera.name}
+										class="w-full h-full object-cover z-0"
+										onError={(e: any) => {
+											// Hide broken stream image so fallback icon shows
+											e.target.style.display = 'none'
+										}}
+									/>
+								) : null}
+
 								{/* Placeholder grid lines to simulate inactive stream */}
-								<div class="absolute inset-0 bg-[linear-gradient(rgba(14,23,26,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(14,23,26,0.5)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+								<div class="absolute inset-0 bg-[linear-gradient(rgba(14,23,26,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(14,23,26,0.5)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none -z-10" />
 
 								{/* Dynamic Glow for Critical alert */}
 								{isCritical && (
 									<div class="absolute inset-0 bg-radial from-red-600/15 to-transparent pointer-events-none" />
 								)}
 
-								{/* Static Video Camera Icon in Center */}
-								<svg class={`w-12 h-12 text-slate-800 transition-transform group-hover:scale-110 duration-300 ${isCritical ? 'text-red-900/40' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-								</svg>
+								{/* Static Video Camera Icon in Center (shows if stream not rendered) */}
+								{!camera.entity_id && (
+									<svg class={`w-12 h-12 text-slate-800 transition-transform group-hover:scale-110 duration-300 ${isCritical ? 'text-red-900/40' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+									</svg>
+								)}
 
 								{/* Critical overlay badge */}
 								{isCritical && (
@@ -205,7 +265,7 @@ export function Livefeed({ onNavigate }: Props) {
 								{/* Top-left pill */}
 								<div class="absolute top-4 left-4 flex items-center gap-2 bg-[#050B0D]/80 border border-[#8B949E]/10 px-3 py-1.5 rounded-lg text-xs backdrop-blur-sm select-none font-semibold">
 									<span class="text-accent font-bold font-mono">{camera.id}</span>
-									<span class="text-slate-300 font-medium">{camera.name.includes(camera.id) ? camera.name.replace(camera.id, '').trim() : camera.name}</span>
+									<span class="text-slate-300 font-medium">{camera.name}</span>
 								</div>
 
 								{/* Top-right pill */}
@@ -221,7 +281,7 @@ export function Livefeed({ onNavigate }: Props) {
 										<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
 										</svg>
-										Normal
+										Online
 									</span>
 								)}
 
@@ -233,7 +293,7 @@ export function Livefeed({ onNavigate }: Props) {
 
 								{/* Bottom-right overlay info */}
 								<div class="absolute bottom-4 right-4 text-xs font-mono text-slate-500 select-none">
-									{camera.resolution} · {camera.fps.replace(' fps', 'fps')}
+									{camera.resolution} · {camera.fps}
 								</div>
 							</div>
 
@@ -256,7 +316,7 @@ export function Livefeed({ onNavigate }: Props) {
 									<button
 										type="button"
 										class="hover:text-red-400 transition-colors p-1"
-										onClick={() => handleDeleteCamera(camera.id)}
+										onClick={() => handleDeleteCamera(camera)}
 									>
 										<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
 											<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -270,8 +330,8 @@ export function Livefeed({ onNavigate }: Props) {
 							{/* Footer Status Meta */}
 							<div class="grid grid-cols-2 gap-4 text-xs mt-1 ml-15">
 								<div>
-									<span class="text-slate-500 font-mono block mb-1">IP Address</span>
-									<span class="font-mono text-sm text-slate-200">{camera.ip}</span>
+									<span class="text-slate-500 font-mono block mb-1">HA Entity</span>
+									<span class="font-mono text-sm text-slate-200">{camera.entity_id || camera.ip}</span>
 								</div>
 								<div>
 									<span class="text-slate-500 font-mono block mb-1">Status</span>

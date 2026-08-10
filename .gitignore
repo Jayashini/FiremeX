@@ -57,5 +57,9 @@ backend/backend
 # Go coverage output
 *.out
 
+# Environment variables
+.env
+*.env
+
 # Dependency directory (if you ever vendor dependencies)
 vendor/
