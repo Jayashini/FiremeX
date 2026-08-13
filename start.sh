@@ -6,13 +6,12 @@ if docker inspect homeassistant >/dev/null 2>&1; then
     echo "Found existing Home Assistant container using image: $HA_IMAGE"
     echo "HOMEASSISTANT_IMAGE=$HA_IMAGE" > .env
 else
-    # Check if image exists locally
-    if docker image inspect ghcr.io/home-assistant/home-assistant:stable >/dev/null 2>&1; then
-        echo "Found local ghcr.io/home-assistant/home-assistant:stable image."
-        echo "HOMEASSISTANT_IMAGE=ghcr.io/home-assistant/home-assistant:stable" > .env
-    elif docker image inspect homeassistant/home-assistant:stable >/dev/null 2>&1; then
-        echo "Found local homeassistant/home-assistant:stable image."
-        echo "HOMEASSISTANT_IMAGE=homeassistant/home-assistant:stable" > .env
+    # Check if any homeassistant image exists locally
+    LOCAL_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep "home-assistant" | head -n 1)
+    
+    if [ -n "$LOCAL_IMAGE" ]; then
+        echo "Found local Home Assistant image: $LOCAL_IMAGE"
+        echo "HOMEASSISTANT_IMAGE=$LOCAL_IMAGE" > .env
     else
         echo "Home Assistant not found locally. Using default ghcr.io/home-assistant/home-assistant:stable."
         echo "HOMEASSISTANT_IMAGE=ghcr.io/home-assistant/home-assistant:stable" > .env
