@@ -67,3 +67,26 @@ jobs:
       - name: Build Go Backend
         run: go build -o main .
         working-directory: ./backend
+
+
+   # Job 3: Trigger QA-FiremeX repository
+  trigger-qa:
+    name: Trigger QA Deployment
+    needs: [frontend-ci, backend-ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger QA-FiremeX
+        run: |
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.QA_REPO_TOKEN }}" \
+            https://api.github.com/repos/Jayashini/QA-FiremeX/dispatches \
+            -d '{
+              "event_type": "firemex-qa-deploy",
+              "client_payload": {
+                "commit_sha": "${{ github.sha }}",
+                "source_repo": "${{ github.repository }}"
+              }
+            }'
