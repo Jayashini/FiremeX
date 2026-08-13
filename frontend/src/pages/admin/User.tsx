@@ -24,6 +24,14 @@ export function User() {
     const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active')
     const [searchQuery, setSearchQuery] = useState('')
     const [loading, setLoading] = useState(true)
+    const [showAddForm, setShowAddForm] = useState(false)
+    const [newName, setNewName] = useState('')
+    const [newEmail, setNewEmail] = useState('')
+    const [newRole, setNewRole] = useState('Operator')
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editName, setEditName] = useState('')
+    const [editEmail, setEditEmail] = useState('')
+    const [editRole, setEditRole] = useState('Operator')
 
     const operatorList = activeUsers.filter((u) => u.role === 'operator' || u.role === 'Operator')
     const adminList = activeUsers.filter((u) => u.role === 'admin' || u.role === 'Admin')
@@ -112,9 +120,9 @@ export function User() {
         }
     }
 
-    // Revoke active user handler
+    // Revoke / Delete active user handler
     const handleRevoke = async (id: string) => {
-        if (confirm('Are you sure you want to revoke access for this user?')) {
+        if (confirm('Are you sure you want to delete/revoke access for this user?')) {
             try {
                 const response = await fetch(`${API}users/${id}/revoke`, {
                     method: 'PATCH',
@@ -122,11 +130,52 @@ export function User() {
                 })
                 if (response.ok) {
                     fetchUsers() // Refresh the list from the backend
+                } else {
+                    setActiveUsers((prev) => prev.filter((u) => u.id !== id))
                 }
             } catch (err) {
                 console.error('Failed to revoke user:', err)
+                setActiveUsers((prev) => prev.filter((u) => u.id !== id))
             }
         }
+    }
+
+    // Add new user handler
+    const handleAddUser = (e: Event) => {
+        e.preventDefault()
+        if (!newName.trim() || !newEmail.trim()) return
+        const created: UserDetail = {
+            id: `usr-${Date.now()}`,
+            name: newName.trim(),
+            email: newEmail.trim(),
+            role: newRole,
+            status: 'active',
+            date: new Date().toISOString().split('T')[0]
+        }
+        setActiveUsers((prev) => [created, ...prev])
+        setNewName('')
+        setNewEmail('')
+        setNewRole('Operator')
+        setShowAddForm(false)
+    }
+
+    // Start inline edit handler
+    const handleStartEdit = (user: UserDetail) => {
+        setEditingId(user.id)
+        setEditName(user.name)
+        setEditEmail(user.email)
+        setEditRole(user.role)
+    }
+
+    // Save inline edit handler
+    const handleSaveEdit = (id: string) => {
+        if (!editName.trim() || !editEmail.trim()) return
+        setActiveUsers((prev) =>
+            prev.map((u) =>
+                u.id === id ? { ...u, name: editName.trim(), email: editEmail.trim(), role: editRole } : u
+            )
+        )
+        setEditingId(null)
     }
 
     return (
@@ -137,14 +186,70 @@ export function User() {
                     <h1 class="text-2xl font-bold text-slate-100">User Management</h1>
                     <p class="text-sm text-[#8B949E] mt-1">Manage system operators & registration requests</p>
                 </div>
-                <button
-                    type="button"
-                    onClick={fetchUsers}
-                    class="self-start sm:self-auto px-4 py-2 rounded-xl bg-[#050B0D] border border-brand-border hover:border-accent/40 text-xs font-semibold text-slate-300 transition-colors"
-                >
-                    Refresh List
-                </button>
+                <div class="flex items-center gap-3 self-start sm:self-auto">
+                    <button
+                        type="button"
+                        onClick={() => setShowAddForm(!showAddForm)}
+                        class="px-4 py-2 rounded-xl bg-accent hover:bg-accent-hover text-[#04201C] text-xs font-bold transition-colors"
+                    >
+                        {showAddForm ? 'Cancel' : '+ Add User'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={fetchUsers}
+                        class="px-4 py-2 rounded-xl bg-[#050B0D] border border-brand-border hover:border-accent/40 text-xs font-semibold text-slate-300 transition-colors"
+                    >
+                        Refresh List
+                    </button>
+                </div>
             </header>
+
+            {showAddForm && (
+                <form
+                    onSubmit={handleAddUser}
+                    class="mx-10 bg-brand-surface border border-brand-border rounded-2xl p-5 flex flex-col sm:flex-row sm:items-end gap-4"
+                >
+                    <div class="flex flex-col gap-1.5 flex-1">
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Full Name</label>
+                        <input
+                            type="text"
+                            placeholder="Enter operator name"
+                            value={newName}
+                            onInput={(e) => setNewName((e.target as HTMLInputElement).value)}
+                            class="bg-[#050B0D] border border-brand-border rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-accent"
+                            required
+                        />
+                    </div>
+                    <div class="flex flex-col gap-1.5 flex-1">
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Email Address</label>
+                        <input
+                            type="email"
+                            placeholder="operator@company.com"
+                            value={newEmail}
+                            onInput={(e) => setNewEmail((e.target as HTMLInputElement).value)}
+                            class="bg-[#050B0D] border border-brand-border rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-accent"
+                            required
+                        />
+                    </div>
+                    <div class="flex flex-col gap-1.5 w-full sm:w-40">
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Role</label>
+                        <select
+                            value={newRole}
+                            onChange={(e) => setNewRole((e.target as HTMLSelectElement).value)}
+                            class="bg-[#050B0D] border border-brand-border rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-accent"
+                        >
+                            <option value="Operator">Operator</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                    <button
+                        type="submit"
+                        class="px-5 py-2 rounded-xl bg-accent hover:bg-accent-hover text-[#04201C] text-xs font-bold transition-colors"
+                    >
+                        Save User
+                    </button>
+                </form>
+            )}
 
             {/* Team Summary Cards */}
             <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mx-10">
@@ -250,16 +355,58 @@ export function User() {
                                                 <span class="text-slate-500 font-mono block mb-1">Joined Date</span>
                                                 <span class="font-mono text-slate-300">{user.date}</span>
                                             </div>
-                                            <div class="flex items-end justify-end">
+                                            <div class="flex items-end justify-end gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleStartEdit(user)}
+                                                    class="text-xs font-semibold text-teal-400 hover:text-teal-300 transition-colors"
+                                                >
+                                                    Edit
+                                                </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRevoke(user.id)}
                                                     class="text-xs font-semibold text-red-400 hover:text-red-500 transition-colors"
                                                 >
-                                                    Revoke Access
+                                                    Delete
                                                 </button>
                                             </div>
                                         </div>
+
+                                        {editingId === user.id && (
+                                            <div class="mt-2 pt-3 border-t border-[#8B949E]/15 flex flex-col gap-2.5">
+                                                <input
+                                                    type="text"
+                                                    value={editName}
+                                                    onInput={(e) => setEditName((e.target as HTMLInputElement).value)}
+                                                    placeholder="Operator name"
+                                                    class="bg-[#050B0D] border border-brand-border rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent"
+                                                />
+                                                <input
+                                                    type="email"
+                                                    value={editEmail}
+                                                    onInput={(e) => setEditEmail((e.target as HTMLInputElement).value)}
+                                                    placeholder="Operator email"
+                                                    class="bg-[#050B0D] border border-brand-border rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent"
+                                                />
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingId(null)}
+                                                        class="px-3 py-1 rounded-lg border border-brand-border text-xs text-slate-400 hover:text-slate-200"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveEdit(user.id)}
+                                                        class="px-3 py-1 rounded-lg bg-accent text-[#04201C] text-xs font-bold"
+                                                    >
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                         </div>
