@@ -54,7 +54,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.26.5'
           cache: true
           cache-dependency-path: backend/go.sum
 
@@ -69,7 +69,7 @@ jobs:
         working-directory: ./backend
 
 
-   # Job 3: Trigger QA-FiremeX repository
+  # Job 3: Trigger QA-FiremeX repository
   trigger-qa:
     name: Trigger QA Deployment
     needs: [frontend-ci, backend-ci]
