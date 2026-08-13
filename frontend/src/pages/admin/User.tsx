@@ -22,7 +22,21 @@ export function User() {
     const [activeUsers, setActiveUsers] = useState<UserDetail[]>([])
     const [pendingRequests, setPendingRequests] = useState<RequestDetail[]>([])
     const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active')
+    const [searchQuery, setSearchQuery] = useState('')
     const [loading, setLoading] = useState(true)
+
+    const operatorList = activeUsers.filter((u) => u.role === 'operator' || u.role === 'Operator')
+    const adminList = activeUsers.filter((u) => u.role === 'admin' || u.role === 'Admin')
+    const filteredOperators = operatorList.filter((user) =>
+        !searchQuery.trim() ||
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    const filteredPending = pendingRequests.filter((req) =>
+        !searchQuery.trim() ||
+        req.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        req.email.toLowerCase().includes(searchQuery.toLowerCase())
+    )
 
     const token = localStorage.getItem('firemex_token')
 
@@ -118,35 +132,70 @@ export function User() {
     return (
         <div class="flex flex-col gap-6 w-full pb-8">
             {/* Page Header */}
-            <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0 bg-brand-surface border-b border-[#8B949E]/10 p-4 pl-10">
+            <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-brand-surface border-b border-[#8B949E]/10 p-4 pl-10 pr-10">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-100">User Management</h1>
                     <p class="text-sm text-[#8B949E] mt-1">Manage system operators & registration requests</p>
                 </div>
+                <button
+                    type="button"
+                    onClick={fetchUsers}
+                    class="self-start sm:self-auto px-4 py-2 rounded-xl bg-[#050B0D] border border-brand-border hover:border-accent/40 text-xs font-semibold text-slate-300 transition-colors"
+                >
+                    Refresh List
+                </button>
             </header>
 
-            {/* Navigation Tabs */}
-            <div class="flex items-center gap-4 border-b border-[#8B949E]/10 mx-10 pb-4">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('active')}
-                    class={`relative pb-2 text-sm font-semibold transition-all ${activeTab === 'active'
-                        ? 'text-accent border-b-2 border-accent'
-                        : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                >
-                    Active Operators ({activeUsers.filter(u => u.role === 'operator' || u.role === 'Operator').length})
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('pending')}
-                    class={`relative pb-2 text-sm font-semibold transition-all ${activeTab === 'pending'
-                        ? 'text-accent border-b-2 border-accent'
-                        : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                >
-                    Pending Requests ({pendingRequests.length})
-                </button>
+            {/* Team Summary Cards */}
+            <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mx-10">
+                <div class="bg-brand-surface border border-brand-border rounded-2xl p-4 flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Active Operators</span>
+                    <span class="text-2xl font-extrabold text-emerald-400 mt-1">{operatorList.length}</span>
+                    <span class="text-xs text-slate-500">Approved monitoring staff</span>
+                </div>
+                <div class="bg-brand-surface border border-brand-border rounded-2xl p-4 flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Pending Requests</span>
+                    <span class="text-2xl font-extrabold text-amber-400 mt-1">{pendingRequests.length}</span>
+                    <span class="text-xs text-slate-500">Awaiting admin review</span>
+                </div>
+                <div class="bg-brand-surface border border-brand-border rounded-2xl p-4 flex flex-col gap-1">
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Administrators</span>
+                    <span class="text-2xl font-extrabold text-accent mt-1">{adminList.length}</span>
+                    <span class="text-xs text-slate-500">Organization controllers</span>
+                </div>
+            </section>
+
+            {/* Navigation Tabs & Search Filter */}
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#8B949E]/10 mx-10 pb-4">
+                <div class="flex items-center gap-4">
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('active')}
+                        class={`relative pb-2 text-sm font-semibold transition-all ${activeTab === 'active'
+                            ? 'text-accent border-b-2 border-accent'
+                            : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                    >
+                        Active Operators ({operatorList.length})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('pending')}
+                        class={`relative pb-2 text-sm font-semibold transition-all ${activeTab === 'pending'
+                            ? 'text-accent border-b-2 border-accent'
+                            : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                    >
+                        Pending Requests ({pendingRequests.length})
+                    </button>
+                </div>
+                <input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={searchQuery}
+                    onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+                    class="bg-[#050B0D]/80 border border-[#8B949E]/20 focus:border-accent rounded-xl px-4 py-2 text-xs text-slate-200 outline-none w-full sm:w-64"
+                />
             </div>
 
             {/* Tab Content */}
@@ -159,9 +208,7 @@ export function User() {
                     <div>
                         {/* Grid Layout for Active Operators */}
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {activeUsers
-                                .filter((user) => user.role === 'operator' || user.role === 'Operator')
-                                .map((user) => (
+                            {filteredOperators.map((user) => (
                                     <div
                                         key={user.id}
                                         class="bg-[#0B1315]/40 border border-[#8B949E]/10 rounded-3xl p-5 flex flex-col gap-4 relative group hover:border-[#8B949E]/20 transition-all"
@@ -228,7 +275,7 @@ export function User() {
                     <div>
                         {/* Grid Layout for Pending Requests */}
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {pendingRequests.map((req) => (
+                            {filteredPending.map((req) => (
                                 <div
                                     key={req.id}
                                     class="bg-[#0B1315]/40 border border-[#8B949E]/10 rounded-3xl p-5 flex flex-col gap-4 relative group hover:border-[#8B949E]/20 transition-all"
