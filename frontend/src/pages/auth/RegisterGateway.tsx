@@ -28,6 +28,19 @@ export function RegisterGateway({ onNavigate }: Props) {
 
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
+	const [createdOrgCode, setCreatedOrgCode] = useState('')
+	const [copiedOrgCode, setCopiedOrgCode] = useState(false)
+
+	const handleCopyOrgCode = async () => {
+		if (!createdOrgCode) return
+		try {
+			await navigator.clipboard.writeText(createdOrgCode)
+			setCopiedOrgCode(true)
+			setTimeout(() => setCopiedOrgCode(false), 2000)
+		} catch {
+			setCopiedOrgCode(false)
+		}
+	}
 
 	const handleOrgSubmit = async (e: Event) => {
 		e.preventDefault()
@@ -56,6 +69,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 				return
 			}
 
+			setCreatedOrgCode(data.org_code || '')
 			alert(`Organization "${orgName}" registered successfully!\nYour unique Organization Code is: ${data.org_code}\nOperators can use this code to join your team.`)
 			onNavigate('/FiremeX/login')
 		} catch (err) {
@@ -309,6 +323,22 @@ export function RegisterGateway({ onNavigate }: Props) {
 						</div>
 
 						{error && <p class="text-sm font-semibold text-red-500 text-center mb-2 animate-pulse">{error}</p>}
+
+						{createdOrgCode && (
+							<div class="p-4 rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-between gap-3">
+								<div>
+									<span class="text-[10px] uppercase tracking-wider text-slate-400 block">Generated Organization Code</span>
+									<span class="font-mono text-lg font-bold text-accent">{createdOrgCode}</span>
+								</div>
+								<button
+									type="button"
+									onClick={handleCopyOrgCode}
+									class="px-3 py-1.5 rounded-lg bg-[#050B0D] border border-brand-border text-xs text-slate-200"
+								>
+									{copiedOrgCode ? 'Copied' : 'Copy Code'}
+								</button>
+							</div>
+						)}
 
 						<button
 							type="submit"
