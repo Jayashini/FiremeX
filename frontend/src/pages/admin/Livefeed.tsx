@@ -115,7 +115,16 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
  const [warning, setWarning] = useState('')
  const [loaded, setLoaded] = useState(false)
  const [busy, setBusy] = useState<number | null>(null)
+ const [zoneFilter, setZoneFilter] = useState('')
+ const [cameraSearch, setCameraSearch] = useState('')
  const [refresh, setRefresh] = useState(0)
+ const zones = Array.from(new Set(cameras.map(c => c.zone).filter(Boolean)))
+ const aiEnabledCount = cameras.filter(c => c.ai_enabled).length
+ const visibleCameras = cameras.filter(c => {
+  const matchesZone = !zoneFilter || c.zone === zoneFilter
+  const matchesSearch = !cameraSearch.trim() || c.display_name.toLowerCase().includes(cameraSearch.toLowerCase()) || (c.zone || '').toLowerCase().includes(cameraSearch.toLowerCase())
+  return matchesZone && matchesSearch
+ })
  useEffect(() => {
   let stopped = false, running = false, timer = 0
   let abort: AbortController | null = null
@@ -180,10 +189,27 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
   finally { setBusy(null) }
  }
  return <div class="p-6 space-y-6">
-  <header class="flex justify-between gap-4"><div><p class="text-accent text-xs uppercase tracking-widest">Camera monitoring</p><h1 class="text-3xl font-bold mt-2">Live Feed</h1><p class="text-slate-400 mt-2">Home Assistant camera AI runs continuously. Browser webcam AI runs while this page is open.</p></div>{!readOnly && <button class="text-accent" onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}>+ Add camera</button>}</header>
+  <header class="flex flex-wrap items-center justify-between gap-4"><div><p class="text-accent text-xs uppercase tracking-widest">Camera monitoring</p><h1 class="text-3xl font-bold mt-2">Live Feed</h1><p class="text-slate-400 mt-2">Home Assistant camera AI runs continuously. Browser webcam AI runs while this page is open.</p></div><div class="flex flex-wrap items-center gap-3"><input type="text" placeholder="Search camera or zone..." value={cameraSearch} onInput={(e: any) => setCameraSearch(e.currentTarget.value)} class="bg-brand-surface border border-brand-border rounded-xl px-3 py-2 text-xs text-slate-200 outline-none" />{zones.length > 0 && <select aria-label="Filter by zone" value={zoneFilter} onChange={(e: any) => setZoneFilter(e.currentTarget.value)} class="bg-brand-surface border border-brand-border rounded-xl px-3 py-2 text-xs text-slate-200"><option value="">All zones ({cameras.length})</option>{zones.map(z => <option key={z} value={z}>{z}</option>)}</select>}{!readOnly && <button class="text-accent" onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}>+ Add camera</button>}</div></header>
+  <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   <div class="bg-brand-surface border border-brand-border rounded-2xl p-4">
+    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Enrolled Cameras</span>
+    <span class="text-2xl font-extrabold text-slate-100 mt-1 block">{cameras.length}</span>
+    <span class="text-xs text-slate-500">Connected video streams</span>
+   </div>
+   <div class="bg-brand-surface border border-brand-border rounded-2xl p-4">
+    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">AI Monitoring Enabled</span>
+    <span class="text-2xl font-extrabold text-accent mt-1 block">{aiEnabledCount}</span>
+    <span class="text-xs text-slate-500">Active fire/smoke detection</span>
+   </div>
+   <div class="bg-brand-surface border border-brand-border rounded-2xl p-4">
+    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Monitored Zones</span>
+    <span class="text-2xl font-extrabold text-emerald-400 mt-1 block">{zones.length}</span>
+    <span class="text-xs text-slate-500">Assigned facility areas</span>
+   </div>
+  </section>
   {error && <p role="alert" class="text-amber-300">{error}. Displayed status may be stale.</p>}
   {warning && <p role="alert" class="text-amber-300">{warning}</p>}
-  <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">{cameras.map(camera => {
+  <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">{visibleCameras.map(camera => {
    const status = statuses.find(s => s.camera_id === camera.ID)
    const state = detectorAvailable ? status?.state ?? (camera.source_type === 'browser' && camera.ai_enabled ? 'waiting for browser' : 'starting') : 'status unavailable'
    return <article key={camera.ID} class="border border-brand-border bg-brand-surface rounded-2xl overflow-hidden">

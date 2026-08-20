@@ -440,6 +440,26 @@ export function AddDevice({ onNavigate }: Props) {
 						</div>
 					</div>
 
+					{/* Device Enrollment Summary Card */}
+					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 rounded-2xl bg-[#050B0D]/60 border border-[#8B949E]/10">
+						<div>
+							<span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">Selected Source</span>
+							<span class="text-xs font-semibold text-slate-200 mt-1 block">
+								{sourceType === 'browser' ? 'Local Computer Webcam' : (selectedEntityId || 'Not selected')}
+							</span>
+						</div>
+						<div>
+							<span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">Target Facility Zone</span>
+							<span class="text-xs font-semibold text-slate-200 mt-1 block">{newCamZone || 'Unassigned'}</span>
+						</div>
+						<div>
+							<span class="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">AI Fire/Smoke Tracking</span>
+							<span class={`text-xs font-semibold mt-1 block ${newCamAi ? 'text-accent' : 'text-slate-400'}`}>
+								{newCamAi ? 'Enabled on Enrollment' : 'Disabled (View Only)'}
+							</span>
+						</div>
+					</div>
+
 					{/* Browser webcams can be previewed locally before the HA entity is enrolled. */}
 					<div class="border border-[#8B949E]/10 rounded-2xl p-5 mb-8 bg-[#050B0D]/50 flex flex-col items-center justify-center gap-4">
 						{showBrowserWebcamPreview ? <WebcamPreview onDeviceResolved={setBrowserDeviceId} /> : (
