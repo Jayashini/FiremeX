@@ -1,0 +1,21 @@
+# Detection stack for fire_model.pt.
+#
+# torch is CPU-only on purpose: on x86_64 the default PyPI wheel bundles the
+# CUDA runtime (~2.5 GB) that a laptop or a CPU server will never execute. On
+# arm64 (Apple silicon, Raspberry Pi) no CUDA wheels exist at all, so the plain
+# wheel is already CPU-only and no "+cpu" variant is published — hence the
+# marker splitting the two.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu        ; platform_machine == "x86_64"
+torchvision==0.20.1+cpu ; platform_machine == "x86_64"
+torch==2.5.1            ; platform_machine != "x86_64"
+torchvision==0.20.1     ; platform_machine != "x86_64"
+
+ultralytics==8.2.0
+opencv-python-headless==4.9.0.80
+pillow==10.4.0
+
+# Only needed for detect_service.py, not for try_model.py.
+fastapi==0.111.0
+uvicorn==0.29.0
+python-multipart==0.0.9
