@@ -17,6 +17,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 	const [orgAdminName, setOrgAdminName] = useState('')
 	const [orgPassword, setOrgPassword] = useState('')
 	const [orgSector, setOrgSector] = useState('Industrial')
+	const [countryCode, setCountryCode] = useState('+94')
 	const [orgPhone, setOrgPhone] = useState('')
 
 	// Operator form states
@@ -42,9 +43,25 @@ export function RegisterGateway({ onNavigate }: Props) {
 		}
 	}
 
+	const countryPhoneRules: Record<string, { regex: RegExp; hint: string }> = {
+		'+94': { regex: /^\d{9}$/, hint: '9 digits after +94' },
+		'+1': { regex: /^\d{10}$/, hint: '10 digits after +1' },
+		'+44': { regex: /^\d{10}$/, hint: '10 digits after +44' },
+		'+91': { regex: /^\d{10}$/, hint: '10 digits after +91' },
+		'+61': { regex: /^\d{9}$/, hint: '9 digits after +61' }
+	}
+
 	const handleOrgSubmit = async (e: Event) => {
 		e.preventDefault()
 		setError('')
+
+		const cleanedDigits = orgPhone.replace(/[\s\-()]/g, '')
+		const rule = countryPhoneRules[countryCode]
+		if (!rule || !rule.regex.test(cleanedDigits)) {
+			setError(`Invalid contact number for ${countryCode}. Expected ${rule?.hint ?? 'valid digits'}.`)
+			return
+		}
+
 		setLoading(true)
 
 		try {
@@ -55,7 +72,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 					org_name: orgName,
 					sector: orgSector,
 					email: orgEmail,
-					phone: orgPhone,
+					phone: `${countryCode} ${cleanedDigits}`,
 					admin_name: orgAdminName,
 					password: orgPassword
 				})
@@ -266,14 +283,27 @@ export function RegisterGateway({ onNavigate }: Props) {
 
 						<div class="flex flex-col gap-1.5">
 							<label class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Contact Phone</label>
-							<input
-								type="tel"
-								placeholder="+1 (555) 019-2834"
-								value={orgPhone}
-								onInput={(e) => setOrgPhone((e.target as HTMLInputElement).value)}
-								class="bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all"
-								required
-							/>
+							<div class="flex gap-2">
+								<select
+									value={countryCode}
+									onChange={(e) => setCountryCode((e.target as HTMLSelectElement).value)}
+									class="bg-[#050B0D]/80 border border-brand-border rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all"
+								>
+									<option value="+94">+94 (LK)</option>
+									<option value="+1">+1 (US)</option>
+									<option value="+44">+44 (UK)</option>
+									<option value="+91">+91 (IN)</option>
+									<option value="+61">+61 (AU)</option>
+								</select>
+								<input
+									type="tel"
+									placeholder="Enter contact number"
+									value={orgPhone}
+									onInput={(e) => setOrgPhone((e.target as HTMLInputElement).value)}
+									class="flex-1 bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all"
+									required
+								/>
+							</div>
 						</div>
 
 						<div class="border-t border-brand-border/40 my-2 pt-2">
