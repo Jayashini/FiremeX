@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
+import { API } from '../../api'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -28,7 +29,7 @@ export function AddDevice({ onNavigate }: Props) {
 			setHaError('')
 			try {
 				const token = localStorage.getItem('firemex_token')
-				const res = await fetch('http://localhost:8080/api/cameras/available', {
+				const res = await fetch(`${API}cameras/available`, {
 					headers: {
 						Authorization: `Bearer ${token}`
 					}
@@ -75,7 +76,7 @@ export function AddDevice({ onNavigate }: Props) {
 
 		try {
 			const token = localStorage.getItem('firemex_token')
-			const res = await fetch('http://localhost:8080/api/cameras', {
+			const res = await fetch(`${API}cameras`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
@@ -220,7 +221,7 @@ export function AddDevice({ onNavigate }: Props) {
 						<div class="w-full aspect-video rounded-xl bg-[#050B0D] border border-[#8B949E]/10 flex flex-col items-center justify-center gap-3 text-slate-500 overflow-hidden relative">
 							{selectedEntityId ? (
 								<img
-									src={`http://localhost:8080/api/cameras/stream/${selectedEntityId}`}
+									src={`${API}cameras/stream/${selectedEntityId}`}
 									alt="HA Camera Preview"
 									class="w-full h-full object-cover"
 									onError={(e: any) => {

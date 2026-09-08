@@ -3,6 +3,7 @@ package database
 import (
 	"log"
 
+	"github.com/firemex/backend/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -12,8 +13,8 @@ var DB *gorm.DB
 
 // ConnectDB initializes the database connection
 func ConnectDB() {
-	// 1. Define the connection string (Data Source Name)
-	dsn := "host=localhost user=admin password=secretpassword dbname=firemex port=5432 sslmode=disable"
+	// 1. Take the connection string from configuration (see config/config.go)
+	dsn := config.C.DatabaseDSN
 
 	// 2. Open the connection using GORM
 	var err error

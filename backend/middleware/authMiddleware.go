@@ -5,12 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/firemex/backend/config"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
-
-// NOTE: This must perfectly match the secret key in auth.go!
-var jwtSecret = []byte("super_secret_firemex_key_123")
 
 // RequireAuth is the Security Guard that runs before our private routes
 func RequireAuth(c *gin.Context) {
@@ -38,7 +36,7 @@ func RequireAuth(c *gin.Context) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("Unexpected signing method")
 		}
-		return jwtSecret, nil
+		return config.C.JWTSecret, nil
 	})
 
 	// 5. If the token is fake or expired, kick them out

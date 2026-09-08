@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks'
+import { API } from '../../api'
 
 type UserDetail = {
     id: string
@@ -34,7 +35,7 @@ export function User() {
     // Fetch all users from the backend
     const fetchUsers = async () => {
         try {
-            const response = await fetch('http://localhost:8080/api/users', {
+            const response = await fetch(`${API}users`, {
                 headers: authHeaders()
             })
             const data = await response.json()
@@ -70,7 +71,7 @@ export function User() {
     // Approve request handler
     const handleApprove = async (req: RequestDetail) => {
         try {
-            const response = await fetch(`http://localhost:8080/api/users/${req.id}/approve`, {
+            const response = await fetch(`${API}users/${req.id}/approve`, {
                 method: 'PATCH',
                 headers: authHeaders()
             })
@@ -85,7 +86,7 @@ export function User() {
     // Deny request handler
     const handleDeny = async (id: string) => {
         try {
-            const response = await fetch(`http://localhost:8080/api/users/${id}/deny`, {
+            const response = await fetch(`${API}users/${id}/deny`, {
                 method: 'DELETE',
                 headers: authHeaders()
             })
@@ -101,7 +102,7 @@ export function User() {
     const handleRevoke = async (id: string) => {
         if (confirm('Are you sure you want to revoke access for this user?')) {
             try {
-                const response = await fetch(`http://localhost:8080/api/users/${id}/revoke`, {
+                const response = await fetch(`${API}users/${id}/revoke`, {
                     method: 'PATCH',
                     headers: authHeaders()
                 })

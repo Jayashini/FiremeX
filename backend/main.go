@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
+	"github.com/firemex/backend/config"
 	"github.com/firemex/backend/controllers"
 	"github.com/firemex/backend/database"
 	"github.com/firemex/backend/middleware"
@@ -18,6 +19,10 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Note: .env file not found or failed to load. Using default environment variables.")
 	}
+
+	// 0.1 Load all settings into config.C.
+	// This must happen after godotenv.Load() and before anything reads config.
+	config.Load()
 
 	// 1. Connect to the Database
 	log.Println("Starting FiremeX backend...")
@@ -35,7 +40,7 @@ func main() {
 
 	// 3.1 CORS Configuration
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     config.C.CORSOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -86,7 +91,6 @@ func main() {
 	}
 
 	// 8. Start the server
-	log.Println("Server is running on port 8080...")
-	router.Run(":8080")
+	log.Println("Server is running on port " + config.C.Port + "...")
+	router.Run(":" + config.C.Port)
 }
-
