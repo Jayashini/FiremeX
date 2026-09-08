@@ -133,3 +133,88 @@ func RegisterOperator(c *gin.Context) {
 		"message": "Operator registration request submitted! Pending admin approval.",
 	})
 }
+
+// GetOrganization returns the caller's own organisation.
+//
+// The join code is included for administrators only - see organizationResponse
+// in me.go for why.
+func GetOrganization(c *gin.Context) {
+	orgID, ok := currentOrgID(c)
+	if !ok {
+		return
+	}
+	user, ok := currentUser(c)
+	if !ok {
+		return
+	}
+
+	var org models.Organization
+	if err := database.DB.First(&org, orgID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Organization not found"})
+		return
+	}
+
+	response := organizationResponse{
+		ID:     org.ID,
+		Name:   org.Name,
+		Sector: org.Sector,
+		Email:  org.Email,
+		Phone:  org.Phone,
+	}
+	if user.Role == "admin" {
+		response.Code = org.Code
+	}
+
+	c.JSON(http.StatusOK, gin.H{"organization": response})
+}
+
+// UpdateOrganization lets an administrator edit their own organisation's
+// details. Admin-only, and scoped to their own organisation.
+//
+// The join code is never editable: operators may already be holding it, and
+// changing it would silently break their ability to request access.
+func UpdateOrganization(c *gin.Context) {
+	orgID, ok := currentOrgID(c)
+	if !ok {
+		return
+	}
+
+	var input struct {
+		Name   string `json:"name" binding:"required"`
+		Sector string `json:"sector" binding:"required"`
+		Email  string `json:"email" binding:"required,email"`
+		Phone  string `json:"phone"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
+		return
+	}
+
+	var org models.Organization
+	if err := database.DB.First(&org, orgID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Organization not found"})
+		return
+	}
+
+	org.Name = input.Name
+	org.Sector = input.Sector
+	org.Email = input.Email
+	org.Phone = input.Phone
+
+	if err := database.DB.Save(&org).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update organization"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Organization updated",
+		"organization": organizationResponse{
+			ID:     org.ID,
+			Name:   org.Name,
+			Sector: org.Sector,
+			Email:  org.Email,
+			Phone:  org.Phone,
+			Code:   org.Code,
+		},
+	})
+}

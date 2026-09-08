@@ -73,6 +73,15 @@ func main() {
 		// Camera routes for authenticated users
 		protected.GET("/cameras", controllers.GetCameras)
 		protected.GET("/cameras/stream/:entity_id", controllers.StreamCamera)
+
+		// The logged-in user's own account (profile page)
+		protected.GET("/me", controllers.GetMe)
+		protected.PATCH("/me", controllers.UpdateMe)
+		protected.POST("/me/password", controllers.ChangePassword)
+
+		// Read-only view of the caller's organisation.
+		// The join code is included for admins only - see me.go.
+		protected.GET("/organization", controllers.GetOrganization)
 	}
 
 	// 7. Admin-Only Routes (Require JWT + Admin role)
@@ -88,6 +97,10 @@ func main() {
 		admin.GET("/cameras/available", controllers.GetAvailableCameras)
 		admin.POST("/cameras", controllers.AddCamera)
 		admin.DELETE("/cameras/:id", controllers.DeleteCamera)
+
+		// Settings page: organisation details and dependency health
+		admin.PATCH("/organization", controllers.UpdateOrganization)
+		admin.GET("/system/status", controllers.GetSystemStatus)
 	}
 
 	// 8. Start the server

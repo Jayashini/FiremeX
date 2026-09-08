@@ -6,62 +6,38 @@ type Props = {
 }
 
 export function Login({ onNavigate }: Props) {
-	const [isRegistering, setIsRegistering] = useState(false)
-	const [email, setEmail] = useState('operator@gmail.com')
-	const [password, setPassword] = useState('operator12345')
-	const [name, setName] = useState('')
+	const [email, setEmail] = useState('')
+	const [password, setPassword] = useState('')
 	const [showPassword, setShowPassword] = useState(false)
 	const [error, setError] = useState('')
 
-		const handleSubmit = async (e: Event) => {
+	const handleSubmit = async (e: Event) => {
 		e.preventDefault()
 		setError('') // Clear any old errors
 
-		if (isRegistering) {
-			// Keep your old registration mockup code here
-			const savedPending = localStorage.getItem('firemex_pending_users')
-			const pending = savedPending ? JSON.parse(savedPending) : [
-				{ id: 'usr-101', name: 'Bob Johnson', email: 'bob@gmail.com', role: 'Operator', date: '2026-07-09' },
-				{ id: 'usr-102', name: 'Alice Williams', email: 'alice@gmail.com', role: 'Operator', date: '2026-07-10' }
-			]
-			const newRequest = {
-				id: `usr-${Date.now()}`,
-				name,
-				email,
-				role: 'Operator',
-				date: new Date().toISOString().split('T')[0]
+		try {
+			// 1. Send the email and password to the Go backend
+			const response = await fetch(`${BASE}login`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email, password })
+			})
+
+			const data = await response.json()
+
+			// 2. If the backend says the password is wrong
+			if (!response.ok) {
+				setError(data.error || 'Login failed')
+				return
 			}
-			localStorage.setItem('firemex_pending_users', JSON.stringify([...pending, newRequest]))
-			alert('Access request submitted successfully! Pending administrator approval.')
-			setIsRegistering(false)
-			setName('')
-			setEmail('operator@gmail.com')
-			setPassword('operator12345')
-		} else {
-			try {
-				// 1. Send the email and password to the Go backend
-				const response = await fetch(`${BASE}login`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ email, password })
-				})
 
-				const data = await response.json()
+			// 3. Success! Save the JWT token
+			localStorage.setItem('firemex_token', data.token)
 
-				// 2. If the backend says the password is wrong
-				if (!response.ok) {
-					setError(data.error || 'Login failed')
-					return
-				}
-
-				// 3. Success! Save the JWT token
-				localStorage.setItem('firemex_token', data.token)
-
-				// 4. Go to the dashboard
-				onNavigate('/FiremeX/admin/dashboard')
-			} catch (err) {
-				setError('Network error. Is the backend running?')
-			}
+			// 4. Go to the dashboard
+			onNavigate('/FiremeX/admin/dashboard')
+		} catch (err) {
+			setError('Network error. Is the backend running?')
 		}
 	}
 
@@ -79,33 +55,15 @@ export function Login({ onNavigate }: Props) {
 			{/* Form Header */}
 			<div class="pl-2 mb-9">
 				<h1 class="text-[16px] font-semibold text-slate-100">
-					{isRegistering ? 'Request Access' : 'Login in'}
+					Sign in
 				</h1>
 				<p class="text-[12px] text-[#8B949E]">
-					{isRegistering ? 'Submit a request to join the operator team' : 'Operator & administrator access'}
+					Operator & administrator access
 				</p>
 			</div>
 
 			{/* Form */}
 			<form onSubmit={handleSubmit} class="flex flex-col gap-5">
-				{/* Full Name (Only when registering) */}
-				{isRegistering && (
-					<div class="flex flex-col gap-2 mb-2">
-						<label htmlFor="name" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-							Full Name
-						</label>
-						<input
-							id="name"
-							type="text"
-							placeholder="John Doe"
-							value={name}
-							onInput={(e) => setName((e.target as HTMLInputElement).value)}
-							class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
-							required
-						/>
-					</div>
-				)}
-
 				{/* Email */}
 				<div class="flex flex-col gap-2 mb-2">
 					<label htmlFor="email" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -127,15 +85,6 @@ export function Login({ onNavigate }: Props) {
 						<label htmlFor="password" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">
 							Password
 						</label>
-						{!isRegistering && (
-							<button
-								type="button"
-								class="text-xs text-accent hover:text-accent-hover transition-colors"
-								onClick={() => alert('Reset password link sent to email.')}
-							>
-								Forgot password?
-							</button>
-						)}
 					</div>
 					<div class="relative w-full">
 						<input
@@ -172,7 +121,7 @@ export function Login({ onNavigate }: Props) {
 					type="submit"
 					class="w-full mt-4 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-3.5 px-4 rounded-xl shadow-lg transition-all duration-200"
 				>
-					{isRegistering ? 'Submit Request' : 'Sign in'}
+					Sign in
 				</button>
 			</form>
 
