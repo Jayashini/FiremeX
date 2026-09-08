@@ -190,7 +190,9 @@ stop_server
 # ---------------------------------------------------------------- RESULT
 head_ "RESULT"
 printf "  passed: %s   failed: %s   skipped: %s\n" "$PASS" "$FAIL" "$SKIP"
-printf "\n  Note: a test organisation (%s, %s) was created in your dev database.\n" "$ORG_CODE" "$EMAIL"
-printf "  Remove it with:\n"
-printf "    docker compose exec -T db psql -U admin -d firemex -c \"DELETE FROM users WHERE email='%s'; DELETE FROM organizations WHERE code='%s';\"\n\n" "$EMAIL" "$ORG_CODE"
+printf "\n  A test organisation (%s) was created in your dev database. Remove it with:\n\n" "$ORG_CODE"
+printf "docker compose exec -T db psql -U admin -d firemex <<'SQL'\n"
+printf "DELETE FROM users WHERE email = '%s';\n" "$EMAIL"
+printf "DELETE FROM organizations WHERE code = '%s';\n" "$ORG_CODE"
+printf "SQL\n\n"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

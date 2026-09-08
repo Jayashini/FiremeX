@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks'
+import { PreviewBanner } from '../../components/common/PreviewBanner'
 
 
 type Incident = {
@@ -218,6 +219,8 @@ export function Incidents() {
 					</div>
 				</div>
 			</header>
+
+			<PreviewBanner what="incidents" />
 
 			{/* Search input bar */}
 			<div class="relative w-full max-w-md mt-3 m-4 mx-90">

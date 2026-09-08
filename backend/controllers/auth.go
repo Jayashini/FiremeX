@@ -12,42 +12,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func Register(c *gin.Context) {
-	var input struct {
-		Name     string `json:"name" binding:"required"`
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required,min=6"`
-	}
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
-		return
-	}
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
-		return
-	}
-	user := models.User{
-		Name:     input.Name,
-		Email:    input.Email,
-		Password: string(hashedPassword),
-	}
-	result := database.DB.Create(&user)
-	if result.Error != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already exists or database error"})
-		return
-	}
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "User registered successfully!",
-		"user": gin.H{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  user.Role,
-		},
-	})
-}
-
 // Login verifies credentials and gives the user a JWT ticket
 func Login(c *gin.Context) {
 	// 1. Create a struct to catch the login request (only needs email and password)
@@ -63,7 +27,7 @@ func Login(c *gin.Context) {
 
 	// 2. Search the database for a user with this email
 	var user models.User
-	if err := database.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
+	if err := database.DB.Preload("Organization").Where("email = ?", input.Email).First(&user).Error; err != nil {
 		// We purposefully give a vague error so hackers don't know if the email exists
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
 		return
@@ -101,8 +65,12 @@ func Login(c *gin.Context) {
 	}
 
 	// 6. Send the token back to the frontend!
+	// The user is returned alongside the token so the frontend knows which
+	// screens to show without an extra round trip. This is for display only -
+	// permission is always re-checked server-side on every request.
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Login successful",
 		"token":   tokenString,
+		"user":    buildUserResponse(user),
 	})
 }

@@ -8,16 +8,6 @@ export function Footer() {
 			</div>
 
 			<div class="flex items-center gap-6">
-				{/* System Status */}
-				<div class="flex items-center gap-2">
-					<span class="relative flex h-2 w-2">
-						<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-						<span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-					</span>
-					<span class="text-[11px] text-slate-400 font-medium">System operational</span>
-				</div>
-
-				<span class="text-slate-700">|</span>
 
 				<div class="flex items-center gap-4">
 					<a href="#" onClick={(e) => { e.preventDefault(); alert('Opening Documentation...'); }} class="hover:text-accent transition-colors font-medium">Documentation</a>

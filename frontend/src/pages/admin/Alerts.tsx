@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks'
+import { PreviewBanner } from '../../components/common/PreviewBanner'
 
 type AlertNotification = {
 	id: string
@@ -148,6 +149,8 @@ export function Alerts() {
 					</div>
 				</div>
 			</header>
+
+			<PreviewBanner what="alerts" />
 
 			{/* Stats Overview Grid */}
 			<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-0 m-6">
