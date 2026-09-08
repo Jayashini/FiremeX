@@ -4,16 +4,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/firemex/backend/config"
 	"github.com/firemex/backend/database"
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
-
-// A secret key used to digitally sign our JWT tickets.
-// In a real production app, this should be hidden in an environment (.env) file!
-var jwtSecret = []byte("super_secret_firemex_key_123")
 
 func Register(c *gin.Context) {
 	var input struct {
@@ -97,7 +94,7 @@ func Login(c *gin.Context) {
 	})
 
 	// 5. Sign the ticket with our secret key
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString(config.C.JWTSecret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})
 		return

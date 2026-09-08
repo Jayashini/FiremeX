@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks'
+import { BASE } from '../../api'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -34,7 +35,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 		setLoading(true)
 
 		try {
-			const response = await fetch('http://localhost:8080/register/organization', {
+			const response = await fetch(`${BASE}register/organization`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -70,7 +71,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 		setLoading(true)
 
 		try {
-			const response = await fetch('http://localhost:8080/register/operator', {
+			const response = await fetch(`${BASE}register/operator`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({

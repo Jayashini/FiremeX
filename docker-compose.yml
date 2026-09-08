@@ -4,7 +4,8 @@ services:
     image: ${HOMEASSISTANT_IMAGE:-ghcr.io/home-assistant/home-assistant:stable}
     volumes:
       - ./homeassistant_config:/config
-      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=Asia/Colombo
     restart: unless-stopped
     ports:
       - "8123:8123"
