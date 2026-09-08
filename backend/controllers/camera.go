@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 
+	"github.com/firemex/backend/config"
 	"github.com/firemex/backend/database"
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
@@ -21,12 +21,8 @@ type HAState struct {
 
 // GetAvailableCameras fetches all camera entities from Home Assistant API
 func GetAvailableCameras(c *gin.Context) {
-	haURL := os.Getenv("HA_URL")
-	haToken := os.Getenv("HA_TOKEN")
-
-	if haURL == "" {
-		haURL = "http://localhost:8123"
-	}
+	haURL := config.C.HAURL
+	haToken := config.C.HAToken
 
 	req, err := http.NewRequest("GET", haURL+"/api/states", nil)
 	if err != nil {
@@ -160,12 +156,8 @@ func DeleteCamera(c *gin.Context) {
 // StreamCamera proxies the Home Assistant MJPEG stream to avoid CORS issues in browser
 func StreamCamera(c *gin.Context) {
 	entityID := c.Param("entity_id")
-	haURL := os.Getenv("HA_URL")
-	haToken := os.Getenv("HA_TOKEN")
-
-	if haURL == "" {
-		haURL = "http://localhost:8123"
-	}
+	haURL := config.C.HAURL
+	haToken := config.C.HAToken
 
 	reqURL := fmt.Sprintf("%s/api/camera_proxy_stream/%s", haURL, entityID)
 	req, err := http.NewRequest("GET", reqURL, nil)

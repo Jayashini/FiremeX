@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
+import { API } from '../../api'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -66,7 +67,7 @@ export function Livefeed({ onNavigate }: Props) {
 			const token = localStorage.getItem('firemex_token')
 			if (!token) return
 
-			const res = await fetch('http://localhost:8080/api/cameras', {
+			const res = await fetch(`${API}cameras`, {
 				headers: { Authorization: `Bearer ${token}` }
 			})
 
@@ -116,7 +117,7 @@ export function Livefeed({ onNavigate }: Props) {
 		if (camera.db_id) {
 			try {
 				const token = localStorage.getItem('firemex_token')
-				await fetch(`http://localhost:8080/api/cameras/${camera.db_id}`, {
+				await fetch(`${API}cameras/${camera.db_id}`, {
 					method: 'DELETE',
 					headers: { Authorization: `Bearer ${token}` }
 				})
@@ -230,7 +231,7 @@ export function Livefeed({ onNavigate }: Props) {
 								{/* Live HA Stream or Fallback */}
 								{camera.entity_id ? (
 									<img
-										src={`http://localhost:8080/api/cameras/stream/${camera.entity_id}`}
+										src={`${API}cameras/stream/${camera.entity_id}`}
 										alt={camera.name}
 										class="w-full h-full object-cover z-0"
 										onError={(e: any) => {

@@ -63,3 +63,5 @@ backend/backend
 
 # Dependency directory (if you ever vendor dependencies)
 vendor/
+# FiremeX generated signing secret
+.firemex_secret

@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks'
+import { BASE } from '../../api'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -39,7 +40,7 @@ export function Login({ onNavigate }: Props) {
 		} else {
 			try {
 				// 1. Send the email and password to the Go backend
-				const response = await fetch('http://localhost:8080/login', {
+				const response = await fetch(`${BASE}login`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ email, password })
