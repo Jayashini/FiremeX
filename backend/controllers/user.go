@@ -8,16 +8,28 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetAllUsers returns all users, split into active and pending lists
+// Every handler here is admin-only (see main.go) AND scoped to the caller's
+// own organisation. When a record belongs to another organisation we answer
+// 404 rather than 403, so an administrator cannot use these endpoints to
+// discover that an account exists somewhere else in the system.
+
+// GetAllUsers returns this organisation's users, split into active and pending
 func GetAllUsers(c *gin.Context) {
+	orgID, ok := currentOrgID(c)
+	if !ok {
+		return
+	}
+
 	var activeUsers []models.User
 	var pendingUsers []models.User
 
-	// Get active users (with their organization data loaded)
-	database.DB.Preload("Organization").Where("status = ?", "active").Find(&activeUsers)
+	database.DB.Preload("Organization").
+		Where("organization_id = ? AND status = ?", orgID, "active").
+		Find(&activeUsers)
 
-	// Get pending users (with their organization data loaded)
-	database.DB.Preload("Organization").Where("status = ?", "pending").Find(&pendingUsers)
+	database.DB.Preload("Organization").
+		Where("organization_id = ? AND status = ?", orgID, "pending").
+		Find(&pendingUsers)
 
 	c.JSON(http.StatusOK, gin.H{
 		"active":  activeUsers,
@@ -27,10 +39,14 @@ func GetAllUsers(c *gin.Context) {
 
 // ApproveUser changes a pending user's status to active
 func ApproveUser(c *gin.Context) {
+	orgID, ok := currentOrgID(c)
+	if !ok {
+		return
+	}
 	id := c.Param("id")
 
 	var user models.User
-	if err := database.DB.First(&user, id).Error; err != nil {
+	if err := database.DB.Where("organization_id = ?", orgID).First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -51,10 +67,14 @@ func ApproveUser(c *gin.Context) {
 
 // DenyUser deletes a pending user from the database
 func DenyUser(c *gin.Context) {
+	orgID, ok := currentOrgID(c)
+	if !ok {
+		return
+	}
 	id := c.Param("id")
 
 	var user models.User
-	if err := database.DB.First(&user, id).Error; err != nil {
+	if err := database.DB.Where("organization_id = ?", orgID).First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -72,10 +92,14 @@ func DenyUser(c *gin.Context) {
 
 // RevokeUser changes an active user's status to revoked
 func RevokeUser(c *gin.Context) {
+	orgID, ok := currentOrgID(c)
+	if !ok {
+		return
+	}
 	id := c.Param("id")
 
 	var user models.User
-	if err := database.DB.First(&user, id).Error; err != nil {
+	if err := database.DB.Where("organization_id = ?", orgID).First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}

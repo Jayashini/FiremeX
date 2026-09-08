@@ -85,22 +85,9 @@ func AddCamera(c *gin.Context) {
 		return
 	}
 
-	// Get logged-in user
-	userIDFloat, _ := c.Get("userID")
-	userID := uint(userIDFloat.(float64))
-
-	var user models.User
-	if err := database.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+	orgID, ok := currentOrgID(c)
+	if !ok {
 		return
-	}
-
-	var orgID uint
-	if user.OrganizationID != nil {
-		orgID = *user.OrganizationID
-	} else {
-		// Fallback for primary system admin without org
-		orgID = 1
 	}
 
 	camera := models.Camera{
@@ -121,31 +108,34 @@ func AddCamera(c *gin.Context) {
 
 // GetCameras fetches all cameras for the user's organization
 func GetCameras(c *gin.Context) {
-	userIDFloat, _ := c.Get("userID")
-	userID := uint(userIDFloat.(float64))
-
-	var user models.User
-	if err := database.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+	orgID, ok := currentOrgID(c)
+	if !ok {
 		return
 	}
 
 	var cameras []models.Camera
-	if user.OrganizationID != nil {
-		database.DB.Where("organization_id = ?", *user.OrganizationID).Find(&cameras)
-	} else {
-		// System admin gets all cameras
-		database.DB.Find(&cameras)
-	}
+	database.DB.Where("organization_id = ?", orgID).Find(&cameras)
 
 	c.JSON(http.StatusOK, gin.H{"cameras": cameras})
 }
 
-// DeleteCamera removes a camera record from DB
+// DeleteCamera removes a camera record from DB.
+// A camera belonging to another organisation answers 404, not 403, so this
+// endpoint cannot be used to find out which camera ids exist elsewhere.
 func DeleteCamera(c *gin.Context) {
+	orgID, ok := currentOrgID(c)
+	if !ok {
+		return
+	}
 	id := c.Param("id")
 
-	if err := database.DB.Delete(&models.Camera{}, id).Error; err != nil {
+	var camera models.Camera
+	if err := database.DB.Where("organization_id = ?", orgID).First(&camera, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Camera not found"})
+		return
+	}
+
+	if err := database.DB.Delete(&camera).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete camera"})
 		return
 	}
@@ -155,7 +145,22 @@ func DeleteCamera(c *gin.Context) {
 
 // StreamCamera proxies the Home Assistant MJPEG stream to avoid CORS issues in browser
 func StreamCamera(c *gin.Context) {
+	orgID, ok := currentOrgID(c)
+	if !ok {
+		return
+	}
 	entityID := c.Param("entity_id")
+
+	// Only proxy cameras this organisation has actually added. Without this
+	// check any logged-in user could stream any Home Assistant camera simply
+	// by guessing its entity id.
+	var camera models.Camera
+	if err := database.DB.Where("organization_id = ? AND entity_id = ?", orgID, entityID).
+		First(&camera).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Camera not found"})
+		return
+	}
+
 	haURL := config.C.HAURL
 	haToken := config.C.HAToken
 
