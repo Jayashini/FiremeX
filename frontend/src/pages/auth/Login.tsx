@@ -1,11 +1,14 @@
 import { useState } from 'preact/hooks'
 import { BASE } from '../../api'
+import type { SessionUser } from '../../session'
+import { saveSession } from '../../session'
 
 type Props = {
 	onNavigate: (path: string) => void
+	onSignedIn: (user: SessionUser) => void
 }
 
-export function Login({ onNavigate }: Props) {
+export function Login({ onNavigate, onSignedIn }: Props) {
 	const [email, setEmail] = useState('')
 	const [password, setPassword] = useState('')
 	const [showPassword, setShowPassword] = useState(false)
@@ -31,11 +34,11 @@ export function Login({ onNavigate }: Props) {
 				return
 			}
 
-			// 3. Success! Save the JWT token
-			localStorage.setItem('firemex_token', data.token)
+			// 3. Success! Store the token and who we are
+			saveSession(data.token, data.user)
 
-			// 4. Go to the dashboard
-			onNavigate('/FiremeX/admin/dashboard')
+			// 4. Admins and operators land on different pages
+			onSignedIn(data.user)
 		} catch (err) {
 			setError('Network error. Is the backend running?')
 		}

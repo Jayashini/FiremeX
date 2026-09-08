@@ -1,6 +1,10 @@
+import type { SessionUser } from '../../session'
+import { UserFooter } from './UserFooter'
+
 type Props = {
-	activePage: 'dashboard' | 'livefeed' | 'incidents' | 'alerts' | 'users' | 'settings' | 'cameras'
+	activePage: 'dashboard' | 'livefeed' | 'incidents' | 'alerts' | 'users' | 'settings' | 'cameras' | 'profile'
 	onNavigate: (path: string) => void
+	user: SessionUser | null
 }
 
 type SidebarItem = {
@@ -74,7 +78,7 @@ const items: SidebarItem[] = [
 	}
 ]
 
-export function AdminSidebar({ activePage, onNavigate }: Props) {
+export function AdminSidebar({ activePage, onNavigate, user }: Props) {
 	return (
 		<aside class="flex flex-col justify-between w-full h-[calc(100vh)] bg-brand-surface border-r-1 border-[#8B949E]/10 p-4 select-none shrink-0">
 			<div class="flex flex-col gap-8">
@@ -109,18 +113,7 @@ export function AdminSidebar({ activePage, onNavigate }: Props) {
 				</nav>
 			</div>
 
-			{/* User Profile Footer */}
-			<div class="flex items-center gap-3 pt-4 border-t border-brand-border mt-auto">
-				{/* Avatar */}
-				<div class="relative flex items-center justify-center w-10 h-10 rounded-full bg-slate-800 border border-slate-700 font-bold text-sm text-accent select-none">
-					JS
-					<div class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-brand-surface" />
-				</div>
-				<div class="flex flex-col leading-none">
-					<span class="text-sm font-semibold text-slate-200">J. Silva</span>
-					<span class="text-xs text-slate-500 mt-1">Admin</span>
-				</div>
-			</div>
+			<UserFooter user={user} onNavigate={onNavigate} profilePath="/FiremeX/admin/profile" />
 		</aside>
 	)
 }

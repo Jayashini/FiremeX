@@ -3,6 +3,8 @@ import { API } from '../../api'
 
 type Props = {
 	onNavigate: (path: string) => void
+	/** Operators watch cameras but do not add or remove them. */
+	readOnly?: boolean
 }
 
 const initialCameras = [
@@ -56,7 +58,7 @@ const initialCameras = [
 	}
 ]
 
-export function Livefeed({ onNavigate }: Props) {
+export function Livefeed({ onNavigate, readOnly = false }: Props) {
 	const [cameras, setCameras] = useState<any[]>(initialCameras)
 	const [layout, setLayout] = useState<'2x2' | '1x2'>('2x2')
 	const [timeStr, setTimeStr] = useState('')
@@ -149,7 +151,7 @@ export function Livefeed({ onNavigate }: Props) {
 					<button
 						type="button"
 						class="relative flex items-center justify-center w-10 h-10 bg-brand-surface border border-brand-border hover:border-accent/40 rounded-xl text-slate-400 hover:text-slate-200 transition-colors"
-						onClick={() => onNavigate('/FiremeX/admin/alerts')}
+						onClick={() => onNavigate(readOnly ? '/FiremeX/operator/incidents' : '/FiremeX/admin/alerts')}
 					>
 						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -195,17 +197,19 @@ export function Livefeed({ onNavigate }: Props) {
 						</button>
 					</div>
 
-					{/* Add Camera Button */}
-					<button
-						type="button"
-						class="flex items-center gap-2 bg-accent/10 border border-accent hover:border-accent/40 text-accent font-bold text-xs px-4 py-3 rounded-md transition-all shadow-md shadow-accent/20"
-						onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
-					>
-						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-						</svg>
-						<span>Add Camera</span>
-					</button>
+					{/* Add Camera Button - administrators only */}
+					{!readOnly && (
+						<button
+							type="button"
+							class="flex items-center gap-2 bg-accent/10 border border-accent hover:border-accent/40 text-accent font-bold text-xs px-4 py-3 rounded-md transition-all shadow-md shadow-accent/20"
+							onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
+						>
+							<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+							</svg>
+							<span>Add Camera</span>
+						</button>
+					)}
 				</div>
 			</div>
 
@@ -305,6 +309,7 @@ export function Livefeed({ onNavigate }: Props) {
 									<span class="text-xs font-mono text-slate-200">Zone: {camera.zone}</span>
 								</div>
 								<div class="flex items-center gap-3 text-slate-400">
+									{!readOnly && (
 									<button
 										type="button"
 										class="hover:text-slate-200 transition-colors p-1"
@@ -314,15 +319,18 @@ export function Livefeed({ onNavigate }: Props) {
 											<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
 										</svg>
 									</button>
-									<button
-										type="button"
-										class="hover:text-red-400 transition-colors p-1"
-										onClick={() => handleDeleteCamera(camera)}
-									>
-										<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-										</svg>
-									</button>
+									)}
+									{!readOnly && (
+										<button
+											type="button"
+											class="hover:text-red-400 transition-colors p-1"
+											onClick={() => handleDeleteCamera(camera)}
+										>
+											<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+											</svg>
+										</button>
+									)}
 								</div>
 							</div>
 
@@ -359,23 +367,25 @@ export function Livefeed({ onNavigate }: Props) {
 					)
 				})}
 
-				{/* Add New Camera Dotted Card */}
-				<button
-					type="button"
-					class="flex flex-col items-center justify-center gap-3 bg-accent/5 hover:bg-accent/10 border border-dashed border-accent/30 hover:border-accent/50 rounded-3xl p-8 min-h-[310px] text-center transition-all duration-300"
-					onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
-				>
-					<div class="p-4 bg-[#050B0D] border border-accent/20 rounded-2xl text-accent shadow-md">
-						<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-							<path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-						</svg>
-					</div>
-					<div>
-						<h3 class="text-slate-200 font-bold text-base">Add New Camera</h3>
-						<p class="text-slate-500 text-xs mt-1">Configure a new device stream</p>
-					</div>
-				</button>
+				{/* Add New Camera Dotted Card - administrators only */}
+				{!readOnly && (
+					<button
+						type="button"
+						class="flex flex-col items-center justify-center gap-3 bg-accent/5 hover:bg-accent/10 border border-dashed border-accent/30 hover:border-accent/50 rounded-3xl p-8 min-h-[310px] text-center transition-all duration-300"
+						onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
+					>
+						<div class="p-4 bg-[#050B0D] border border-accent/20 rounded-2xl text-accent shadow-md">
+							<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+								<path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+							</svg>
+						</div>
+						<div>
+							<h3 class="text-slate-200 font-bold text-base">Add New Camera</h3>
+							<p class="text-slate-500 text-xs mt-1">Configure a new device stream</p>
+						</div>
+					</button>
+				)}
 			</section>
 		</div>
 	)
