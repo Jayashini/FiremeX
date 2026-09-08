@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
+import { API } from '../../api'
+import { authHeaders } from '../../session'
+import { PreviewBanner } from '../../components/common/PreviewBanner'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -14,6 +17,15 @@ const recentIncidents = [
 
 export function Dashboard({ onNavigate }: Props) {
 	const [timeStr, setTimeStr] = useState('')
+	// The camera count is the one figure on this page with a real source.
+	const [cameraCount, setCameraCount] = useState<number | null>(null)
+
+	useEffect(() => {
+		fetch(`${API}cameras`, { headers: authHeaders() })
+			.then((r) => (r.ok ? r.json() : null))
+			.then((d) => d && setCameraCount(d.cameras?.length ?? 0))
+			.catch(() => {})
+	}, [])
 
 	// Real-time ticking clock for premium effect
 	useEffect(() => {
@@ -50,31 +62,29 @@ export function Dashboard({ onNavigate }: Props) {
 					<button
 						type="button"
 						class="relative flex items-center justify-center w-10 h-10 bg-brand-surface border border-brand-border hover:border-accent/40 rounded-xl text-slate-400 hover:text-slate-200 transition-colors"
-						onClick={() => onNavigate('/admin/alerts')}
+						onClick={() => onNavigate('/FiremeX/admin/alerts')}
 					>
 						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
 						</svg>
-						<span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
-							3
-						</span>
 					</button>
 				</div>
 			</header>
+
+			<PreviewBanner what="risk level, alerts and incidents" />
 
 			{/* Stats Grid */}
 			<section class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 p-t-3">
 				{/* Stats Card 1 */}
 				<div
 					class="bg-brand-surface border border-brand-border rounded-3xl p-6 flex justify-between items-start cursor-pointer hover:border-slate-800 transition-colors"
-					onClick={() => onNavigate('/admin/livefeed')}
+					onClick={() => onNavigate('/FiremeX/admin/livefeed')}
 				>
 					<div class="flex flex-col gap-1">
-						<span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cameras Online</span>
-						<span class="text-3xl font-extrabold text-slate-100 mt-2">11<span class="text-lg text-slate-500 font-normal"> / 12</span></span>
-						<span class="flex items-center gap-1.5 text-xs text-red-400 mt-4">
-							<span class="w-1.5 h-1.5 rounded-full bg-red-400" />
-							1 camera offline — Cam 08
+						<span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cameras</span>
+						<span class="text-3xl font-extrabold text-slate-100 mt-2">{cameraCount ?? '-'}</span>
+						<span class="flex items-center gap-1.5 text-xs text-slate-500 mt-4">
+							monitored by this organisation
 						</span>
 					</div>
 					<div class="p-3 bg-[#050B0D] border border-brand-border rounded-xl text-accent">
@@ -88,7 +98,7 @@ export function Dashboard({ onNavigate }: Props) {
 				{/* Stats Card 2 */}
 				<div
 					class="bg-brand-surface border border-brand-border rounded-3xl p-6 flex justify-between items-start cursor-pointer hover:border-slate-800 transition-colors"
-					onClick={() => onNavigate('/admin/incidents')}
+					onClick={() => onNavigate('/FiremeX/admin/incidents')}
 				>
 					<div class="flex flex-col gap-1">
 						<span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Current Risk Level</span>
@@ -111,7 +121,7 @@ export function Dashboard({ onNavigate }: Props) {
 				{/* Stats Card 3 */}
 				<div
 					class="bg-brand-surface border border-brand-border rounded-3xl p-6 flex justify-between items-start cursor-pointer hover:border-slate-800 transition-colors"
-					onClick={() => onNavigate('/admin/alerts')}
+					onClick={() => onNavigate('/FiremeX/admin/alerts')}
 				>
 					<div class="flex flex-col gap-1">
 						<span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Alerts</span>
@@ -139,7 +149,7 @@ export function Dashboard({ onNavigate }: Props) {
 					<button
 						type="button"
 						class="text-sm font-semibold text-accent hover:text-accent-hover transition-colors"
-						onClick={() => onNavigate('/admin/incidents')}
+						onClick={() => onNavigate('/FiremeX/admin/incidents')}
 					>
 						View all
 					</button>
@@ -211,7 +221,7 @@ export function Dashboard({ onNavigate }: Props) {
 					<button
 						type="button"
 						class="text-sm font-semibold text-accent hover:text-accent-hover self-end sm:self-auto transition-colors"
-						onClick={() => onNavigate('/admin/livefeed')}
+						onClick={() => onNavigate('/FiremeX/admin/livefeed')}
 					>
 						View all
 					</button>

@@ -7,59 +7,10 @@ type Props = {
 	readOnly?: boolean
 }
 
-const initialCameras = [
-	{
-		id: 'CAM-01',
-		db_id: null,
-		name: 'CAM-01 Main Entrance',
-		zone: 'Warehouse A',
-		status: 'Normal',
-		ip: '192.168.1.101',
-		fps: '25 fps',
-		resolution: '1080p',
-		entity_id: 'camera.demo_camera',
-		time: '06-26 14:42:08'
-	},
-	{
-		id: 'CAM-02',
-		db_id: null,
-		name: 'CAM-02 Entrance',
-		zone: 'Warehouse A',
-		status: 'Critical',
-		ip: '192.168.1.102',
-		fps: '25 fps',
-		resolution: '1080p',
-		entity_id: null,
-		time: '06-26 14:42:08'
-	},
-	{
-		id: 'CAM-03',
-		db_id: null,
-		name: 'CAM-03 Entrance',
-		zone: 'Warehouse C',
-		status: 'Normal',
-		ip: '192.168.1.103',
-		fps: '20 fps',
-		resolution: '1080p',
-		entity_id: null,
-		time: '06-26 14:42:08'
-	},
-	{
-		id: 'CAM-04',
-		db_id: null,
-		name: 'CAM-02 Server Room North',
-		zone: 'Secure IT',
-		status: 'Normal',
-		ip: '192.168.1.104',
-		fps: '30 fps',
-		resolution: '1080p',
-		entity_id: null,
-		time: '06-26 14:42:08'
-	}
-]
 
 export function Livefeed({ onNavigate, readOnly = false }: Props) {
-	const [cameras, setCameras] = useState<any[]>(initialCameras)
+	const [cameras, setCameras] = useState<any[]>([])
+	const [loaded, setLoaded] = useState(false)
 	const [layout, setLayout] = useState<'2x2' | '1x2'>('2x2')
 	const [timeStr, setTimeStr] = useState('')
 
@@ -76,8 +27,8 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 			if (!res.ok) return
 			const data = await res.json()
 
-			if (data.cameras && data.cameras.length > 0) {
-				const mapped = data.cameras.map((c: any, index: number) => ({
+			{
+				const mapped = (data.cameras ?? []).map((c: any, index: number) => ({
 					id: `CAM-${String(index + 1).padStart(2, '0')}`,
 					db_id: c.ID,
 					name: c.display_name,
@@ -93,6 +44,8 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 			}
 		} catch (err) {
 			console.error('Failed to fetch cameras from backend:', err)
+		} finally {
+			setLoaded(true)
 		}
 	}
 
@@ -136,7 +89,7 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 			<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0 bg-brand-surface border-b border-[#8B949E]/10 p-4 pl-10">
 				<div>
 					<h1 class="text-2xl font-bold text-slate-100">Live Feed</h1>
-					<p class="text-sm text-[#8B949E] mt-1">{cameras.length} cameras streaming | 1 critical detection</p>
+					<p class="text-sm text-[#8B949E] mt-1">{cameras.length} {cameras.length === 1 ? 'camera' : 'cameras'} connected</p>
 				</div>
 				<div class="flex items-center gap-3 self-end sm:self-auto">
 					{/* Live Ticker */}
@@ -156,9 +109,6 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
 						</svg>
-						<span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
-							3
-						</span>
 					</button>
 				</div>
 			</header>
@@ -367,8 +317,9 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 					)
 				})}
 
-				{/* Add New Camera Dotted Card - administrators only */}
-				{!readOnly && (
+				{/* Add New Camera Dotted Card - administrators only, and only
+				    alongside existing cameras; the empty state covers the rest */}
+				{!readOnly && cameras.length > 0 && (
 					<button
 						type="button"
 						class="flex flex-col items-center justify-center gap-3 bg-accent/5 hover:bg-accent/10 border border-dashed border-accent/30 hover:border-accent/50 rounded-3xl p-8 min-h-[310px] text-center transition-all duration-300"
@@ -387,6 +338,30 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 					</button>
 				)}
 			</section>
+
+			{/* Nothing to show yet - say so rather than leaving a blank grid */}
+			{loaded && cameras.length === 0 && (
+				<div class="flex flex-col items-center justify-center gap-3 text-center mx-6 py-16 border border-dashed border-brand-border rounded-3xl">
+					<svg class="w-10 h-10 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+					</svg>
+					<h3 class="text-slate-300 font-semibold">No cameras yet</h3>
+					<p class="text-sm text-slate-500 max-w-sm">
+						{readOnly
+							? 'Your administrator has not added any cameras to FiremeX yet.'
+							: 'Connect a camera to Home Assistant, then add it here to start monitoring it.'}
+					</p>
+					{!readOnly && (
+						<button
+							type="button"
+							onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
+							class="mt-2 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-2.5 px-5 rounded-xl text-sm transition-all"
+						>
+							Add your first camera
+						</button>
+					)}
+				</div>
+			)}
 		</div>
 	)
 }
