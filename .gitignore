@@ -65,3 +65,11 @@ backend/backend
 vendor/
 # FiremeX generated signing secret
 .firemex_secret
+
+# MediaMTX generated certificates (Phase 2 dev streaming)
+auto.crt
+auto.key
+
+# MediaMTX dev config - contains a stream password
+mediamtx.yml
+!mediamtx.yml.example

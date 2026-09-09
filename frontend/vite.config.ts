@@ -9,6 +9,7 @@ const backend = process.env.VITE_DEV_BACKEND ?? 'http://localhost:8080'
 const proxy = {
   '/api': { target: backend, changeOrigin: true },
   '/login': { target: backend, changeOrigin: true },
+  '/logout': { target: backend, changeOrigin: true },
   '/register': { target: backend, changeOrigin: true },
   '/ping': { target: backend, changeOrigin: true },
 }

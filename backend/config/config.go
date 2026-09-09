@@ -15,6 +15,13 @@ import (
 	"strings"
 )
 
+// SessionCookie is the name of the cookie that carries the login token.
+//
+// It exists because the camera feed is rendered by an <img> tag, and an image
+// request cannot set an Authorization header - the browser only sends cookies.
+// Every fetch() call still uses the header; this is the fallback for tags.
+const SessionCookie = "firemex_session"
+
 // devPassword is the throwaway password used by docker-compose for local
 // development. If we ever see it in use we warn, so it can never reach a
 // customer installation unnoticed.

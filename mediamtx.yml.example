@@ -1,0 +1,41 @@
+# MediaMTX configuration for FiremeX development streaming (Phase 2).
+#
+# Purpose: get a macOS webcam into Home Assistant. Docker on macOS cannot see
+# the Mac's camera, so ffmpeg publishes it here and Home Assistant reads it
+# back over the network.
+#
+# Run it from the repo root so this file is found:
+#   cd ~/Desktop/Projects/FiremeX && mediamtx
+#
+# SECURITY NOTES
+# MediaMTX binds to all network interfaces, not just localhost - it has to,
+# because the Docker VM reaches the Mac through a gateway address rather than
+# 127.0.0.1. Without the settings below, anyone on the same Wi-Fi could watch
+# your webcam by opening rtsp://<your-mac-ip>:8554/webcam, and anyone could
+# publish their own stream into your server.
+#
+# So this config:
+#   1. turns off every protocol except RTSP
+#   2. requires a username and password to publish or read
+#   3. allows only the single path "webcam", not any path
+
+# 1. Only RTSP is needed. Everything else is off.
+rtmp: no
+hls: no
+webrtc: no
+srt: no
+
+# 2. One account, allowed to publish and read only the webcam path.
+authInternalUsers:
+  - user: firemex
+    pass: generate-your-own-see-README
+    ips: []
+    permissions:
+      - action: publish
+        path: webcam
+      - action: read
+        path: webcam
+
+# 3. Only this path exists. Publishing to any other name is refused.
+paths:
+  webcam:

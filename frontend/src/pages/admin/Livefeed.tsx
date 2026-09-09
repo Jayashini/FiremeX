@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { API } from '../../api'
+import { CameraFrame } from '../../components/common/CameraFrame'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -182,16 +183,12 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 						>
 							{/* Video Frame Preview */}
 							<div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#050B0D] border border-[#8B949E]/10 flex items-center justify-center group">
-								{/* Live HA Stream or Fallback */}
+								{/* Live frames from Home Assistant */}
 								{camera.entity_id ? (
-									<img
-										src={`${API}cameras/stream/${camera.entity_id}`}
+									<CameraFrame
+										entityId={camera.entity_id}
 										alt={camera.name}
-										class="w-full h-full object-cover z-0"
-										onError={(e: any) => {
-											// Hide broken stream image so fallback icon shows
-											e.target.style.display = 'none'
-										}}
+										className="w-full h-full object-cover z-0"
 									/>
 								) : null}
 
