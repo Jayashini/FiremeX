@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { API } from '../../api'
+import { CameraFrame } from '../../components/common/CameraFrame'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -28,17 +29,20 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 			const data = await res.json()
 
 			{
+				// Only fields that come from somewhere real. Frame rate and
+				// resolution used to be hardcoded here as "30 fps" and "1080p"
+				// for every camera, which was simply untrue - this webcam is
+				// 720p at about 5 fps. Home Assistant does not report either,
+				// so rather than invent them we do not show them.
 				const mapped = (data.cameras ?? []).map((c: any, index: number) => ({
 					id: `CAM-${String(index + 1).padStart(2, '0')}`,
 					db_id: c.ID,
 					name: c.display_name,
 					zone: c.zone || 'Default Zone',
-					status: 'Normal',
-					ip: c.entity_id,
-					fps: '30 fps',
-					resolution: '1080p',
 					entity_id: c.entity_id,
-					time: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' }).replace(/\//g, '-') + ' ' + new Date().toLocaleTimeString('en-US', { hour12: false })
+					aiEnabled: c.ai_enabled,
+					// status stays 'Normal' until the detection loop sets it.
+					status: 'Normal'
 				}))
 				setCameras(mapped)
 			}
@@ -171,6 +175,10 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 					}`}
 			>
 				{cameras.map((camera: any) => {
+					// Always false for now: nothing sets a camera to 'Critical'
+					// yet. The detection loop will, and every piece of styling
+					// below that reacts to it then comes alive. Kept rather
+					// than deleted because it is the shape the next phase needs.
 					const isCritical = camera.status === 'Critical'
 					return (
 						<article
@@ -182,16 +190,12 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 						>
 							{/* Video Frame Preview */}
 							<div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#050B0D] border border-[#8B949E]/10 flex items-center justify-center group">
-								{/* Live HA Stream or Fallback */}
+								{/* Live frames from Home Assistant */}
 								{camera.entity_id ? (
-									<img
-										src={`${API}cameras/stream/${camera.entity_id}`}
+									<CameraFrame
+										entityId={camera.entity_id}
 										alt={camera.name}
-										class="w-full h-full object-cover z-0"
-										onError={(e: any) => {
-											// Hide broken stream image so fallback icon shows
-											e.target.style.display = 'none'
-										}}
+										className="w-full h-full object-cover z-0"
 									/>
 								) : null}
 
@@ -213,7 +217,9 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 								{/* Critical overlay badge */}
 								{isCritical && (
 									<div class="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center bg-red-600 border border-red-500 px-3 py-1.5 rounded-xl text-white text-[10px] font-bold tracking-wider shadow-lg uppercase animate-pulse">
-										🔥 FIRE DETECTED — 98.4%
+										{/* No confidence number until a real detection
+										    supplies one - 98.4% was invented. */}
+										🔥 FIRE DETECTED
 									</div>
 								)}
 
@@ -240,15 +246,23 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 									</span>
 								)}
 
-								{/* Bottom-left overlay info */}
+								{/* Bottom-left: the live clock. This used to show the time
+								    the page was loaded, frozen, which looked like a
+								    timestamp on the video and was not one. */}
 								<div class="absolute bottom-4 left-4 flex items-center gap-2 text-xs font-mono text-slate-400 select-none">
 									<span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-									<span>{camera.time}</span>
+									<span>{timeStr}</span>
 								</div>
 
-								{/* Bottom-right overlay info */}
-								<div class="absolute bottom-4 right-4 text-xs font-mono text-slate-500 select-none">
-									{camera.resolution} · {camera.fps}
+								{/* Bottom-right overlay: whether this camera is marked for
+								    fire detection. Real information, unlike the
+								    hardcoded resolution and frame rate this replaced. */}
+								<div class="absolute bottom-4 right-4 text-xs font-mono select-none">
+									{camera.aiEnabled ? (
+										<span class="text-accent">AI monitoring</span>
+									) : (
+										<span class="text-slate-600">AI off</span>
+									)}
 								</div>
 							</div>
 
@@ -259,17 +273,6 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 									<span class="text-xs font-mono text-slate-200">Zone: {camera.zone}</span>
 								</div>
 								<div class="flex items-center gap-3 text-slate-400">
-									{!readOnly && (
-									<button
-										type="button"
-										class="hover:text-slate-200 transition-colors p-1"
-										onClick={() => alert(`Edit config for ${camera.id}`)}
-									>
-										<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-										</svg>
-									</button>
-									)}
 									{!readOnly && (
 										<button
 											type="button"
@@ -290,7 +293,7 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
 							<div class="grid grid-cols-2 gap-4 text-xs mt-1 ml-15">
 								<div>
 									<span class="text-slate-500 font-mono block mb-1">HA Entity</span>
-									<span class="font-mono text-sm text-slate-200">{camera.entity_id || camera.ip}</span>
+									<span class="font-mono text-sm text-slate-200">{camera.entity_id}</span>
 								</div>
 								<div>
 									<span class="text-slate-500 font-mono block mb-1">Status</span>

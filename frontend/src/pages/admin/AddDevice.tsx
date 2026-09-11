@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { API } from '../../api'
+import { CameraFrame } from '../../components/common/CameraFrame'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -220,14 +221,10 @@ export function AddDevice({ onNavigate }: Props) {
 					<div class="border border-[#8B949E]/10 rounded-2xl p-5 mb-8 bg-[#050B0D]/50 flex flex-col items-center justify-center gap-4">
 						<div class="w-full aspect-video rounded-xl bg-[#050B0D] border border-[#8B949E]/10 flex flex-col items-center justify-center gap-3 text-slate-500 overflow-hidden relative">
 							{selectedEntityId ? (
-								<img
-									src={`${API}cameras/stream/${selectedEntityId}`}
+								<CameraFrame
+									entityId={selectedEntityId}
 									alt="HA Camera Preview"
-									class="w-full h-full object-cover"
-									onError={(e: any) => {
-										e.target.onerror = null
-										e.target.style.display = 'none'
-									}}
+									className="w-full h-full object-cover"
 								/>
 							) : (
 								<>

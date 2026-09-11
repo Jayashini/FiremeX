@@ -1,39 +1,131 @@
-# Project Scope: AI Fire & Smoke Detection Incident Management System
+# Project Scope: FiremeX
 
-## 1. Project Overview
-The goal of this project is to build an automated, scalable system that watches CCTV footage using an AI computer vision model to detect fire or smoke. When detected, the system will alert operators and organization admins through a custom-built Security Operations Center (SOC) dashboard. The system focuses on incident state management and real-time alerts without the overhead of processing live video feeds on the web backend.
+> **Supersedes the earlier cloud-relay scope.** The previous version described
+> an AI agent pushing alerts to a cloud endpoint and a backend "completely
+> independent of Home Assistant". That is no longer the direction. FiremeX is
+> now **local-first**: detection and monitoring run inside the customer's own
+> environment, and the Internet is used only for subscription, licensing and
+> updates.
 
-## 2. System Architecture & Core Pillars
+---
 
-### Pillar A: AI Vision Agent
-- **Video Ingestion:** The AI agent will connect to existing CCTV streams (provided via Home Assistant or direct RTSP).
-- **Processing:** The agent will sample the video stream at a low framerate (e.g., 1-3 FPS) to conserve compute resources.
-- **Detection & Extraction:** The AI model will analyze frames for fire and smoke. Upon a positive detection, it will capture the specific frame (image snapshot) showing the threat.
-- **Alert Transmission:** The agent will push the alert metadata (Camera ID, Timestamp) along with the captured image to a Cloud endpoint (e.g., Cloud Storage + Webhook).
+## 1. What FiremeX is
 
-### Pillar B: Custom Backend (Incident Management)
-- **Decoupled Architecture:** A standalone backend, completely independent of Home Assistant.
-- **Alert Ingestion:** Receives the alert payload and image from the Cloud.
-- **State Management:** Logs the event in a database and manages the lifecycle of the incident (States: `New`, `Ongoing`, `Resolved`).
-- **Real-time Communication:** Pushes the alert instantly to connected operator dashboards (e.g., via WebSockets).
-- **Image Request Handling (Option A):** Processes requests from operators to fetch the most recent image from a specific camera and routes that request back to the AI Agent/Home Assistant.
+FiremeX turns an organisation's **existing CCTV cameras** into an early fire
+and smoke warning system. Cameras are connected to Home Assistant; FiremeX
+reads them from there, shows them on one local dashboard, and continuously
+analyses the feeds for smoke and fire. When something is detected it raises an
+alarm for the operators on duty.
 
-### Pillar C: Operator Dashboard (Frontend)
-- **Alert Center:** A real-time web interface for operators.
-- **Incident View:** Displays the initial detection snapshot, camera details, and timestamp.
-- **Incident Tracking:** Provides UI controls for operators to update the status of the fire (e.g., mark as `Ongoing` or `Resolved`).
-- **On-Demand Updates:** Includes a "Request Current Image" feature that pulls the most recent still image from the camera to verify the current status (Option A).
+```
+Cameras  →  Home Assistant  →  FiremeX  →  Local users
+                                  ↑
+                        AI detection runs here,
+                        inside the organisation
+```
 
-## 3. Workflow Summary
-1. Home Assistant's CCTV video stream is watched by the standalone AI agent.
-2. AI agent detects fire/smoke, captures a snapshot, and sends the alert + image to the Cloud.
-3. The Custom Backend receives the data from the cloud and instantly notifies the Frontend.
-4. The Operator views the alert and the snapshot on the dashboard.
-5. The Operator clicks "Request Current Image" to fetch a present, real-time image of the camera to assess the situation.
-6. The Operator updates the incident state in the system (e.g., Ongoing, Resolved).
+It is sold to **organisations**, not individuals: one installation serves the
+whole site, with one administrator and multiple operators sharing it over the
+local network.
 
-## 4. Out of Scope
-To ensure system stability, rapid development, and low bandwidth costs, the following features are explicitly out of scope for this phase:
-- **Option B (Live Video Streaming):** Routing live, continuous video feeds (e.g., 30 FPS) from the cameras to the custom frontend dashboard. Operators will rely entirely on the AI-generated snapshots and on-demand "Present Images" (Option A).
-- **Hardware & NVR Configuration:** Adding, configuring, or networking new cameras must be done at the Home Assistant or NVR level.
-- **PTZ Controls:** Operators cannot physically move (Pan, Tilt, Zoom) the cameras from the custom dashboard.
+**Positioning.** FiremeX is an early-warning and monitoring layer that works
+alongside an organisation's existing fire-safety arrangements. It is not
+presented as a replacement for certified fire-alarm systems.
+
+---
+
+## 2. Architecture
+
+| Part | What it does | Runs on |
+|---|---|---|
+| Home Assistant | Owns the cameras and exposes them over its API | Customer site |
+| Go backend (Gin + GORM) | Accounts, organisations, cameras, camera stream proxy | Customer site |
+| Preact frontend | The dashboard operators and admins use | Browser, local network |
+| Detection service (Python) | YOLOv8 fire/smoke model behind an HTTP endpoint | Customer site |
+| PostgreSQL | Users, organisations, cameras | Customer site |
+
+Everything runs locally. The browser never talks to Home Assistant directly —
+the Go backend proxies camera streams so the HA token never leaves the server.
+
+---
+
+## 3. What is built
+
+### Working end to end
+- Organisation registration, which creates the organisation and its first admin
+- Operator self-registration using the organisation's join code, gated by admin approval
+- Login with JWT; approve, deny and revoke operator accounts
+- Camera discovery from Home Assistant and per-organisation camera records
+- Live camera streaming through the backend proxy
+- Admin and operator roles with separate navigation and permissions
+- Profile page (rename, change password) and Settings page (organisation details, join code, team and camera counts, dependency status)
+- All settings read from configuration; per-installation signing key
+- Every user and camera endpoint scoped to the caller's organisation
+
+### Built but not connected
+- **Detection model** (`firemex-model/`) — trained YOLOv8n for `fire` and `smoke`, with an HTTP service on port 8100. It works standalone. **Nothing calls it yet.**
+
+### Designed, showing sample data
+- Dashboard, Incidents and Alerts. These pages carry a visible "Preview" banner until real detections exist.
+
+### Not started
+- The detection loop that connects cameras to the model
+- Incident records in the database
+- Alarm delivery and notifications
+- Subscription, licensing and activation
+- Packaging as a Home Assistant add-on
+
+---
+
+## 4. The next milestone
+
+The three parts above — cameras, dashboard, detection model — all work, but
+nothing joins them. The next piece of work is that connection:
+
+```
+every N seconds, for each camera with AI enabled:
+    grab a still from Home Assistant
+    POST it to the detection service
+    if a hazard is found → save an Incident → alert the operators on screen
+```
+
+This turns the sample pages into real ones and is the single highest-value
+piece of work remaining.
+
+**Detection is advisory, not automatic.** A detection becomes an alert; a
+person confirms it; only then is it an incident. Nothing physical is ever
+triggered directly by the model.
+
+---
+
+## 5. Out of scope
+
+- **Continuous video recording or storage.** FiremeX views live streams and, later, saves detection snapshots. It is not an NVR.
+- **Camera and network configuration.** Adding or configuring cameras happens in Home Assistant or on the NVR.
+- **PTZ control.** Operators cannot pan, tilt or zoom cameras from FiremeX.
+- **Password reset by email.** Users change their own password from the Profile page; there is no email delivery.
+- **Multi-site management.** One installation serves one organisation at one site.
+
+---
+
+## 6. Known constraints
+
+These are real limits the team should keep in view.
+
+- **Model accuracy.** The current model is v1: precision 0.53, recall 0.35, and `fire` recall around 0.22. It is usable for demonstration and development, not for a safety guarantee. See `firemex-model/README.md`.
+- **Licensing.** Ultralytics YOLO is AGPL-3.0, and Ultralytics states that trained models fall under it too. That is fine for coursework, but a commercial FiremeX would need an Ultralytics Enterprise Licence or a different runtime. This must be settled before the product is sold.
+- **Add-on packaging.** The development environment runs the `homeassistant/home-assistant` Docker image, which does **not** support add-ons. Shipping FiremeX as a true Home Assistant add-on requires Home Assistant OS or Supervised; otherwise it ships as a docker-compose bundle and the wording "plugin" should be softened.
+
+---
+
+## 7. Documentation
+
+| File | Contents |
+|---|---|
+| `README.md` | Frontend overview and how to run it |
+| `HOME_ASSISTANT_SETUP.md` | Getting Home Assistant running |
+| `CAMERA_SETUP.md` | Connecting cameras to Home Assistant |
+| `USER_MANAGEMENT.md` | Organisations, roles and approval flow |
+| `firemex-model/README.md` | The model, its accuracy, and how to call it |
+| `FiremeX_Business_Direction_Document.docx` | Business, market and commercial direction |
+| `scripts/test-*.sh` | Automated checks for config, organisation isolation and accounts |

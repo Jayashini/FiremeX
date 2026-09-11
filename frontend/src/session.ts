@@ -4,7 +4,7 @@
 // it on every request. The user object stored alongside it is purely so the app
 // knows which screens to draw without asking the server first. Someone editing
 // it in devtools sees different menus and still gets 403 from the API.
-import { API } from './api'
+import { API, BASE } from './api'
 
 export type Organization = {
 	id: number
@@ -55,6 +55,11 @@ export function saveUser(user: SessionUser) {
 export function clearSession() {
 	localStorage.removeItem(TOKEN_KEY)
 	localStorage.removeItem(USER_KEY)
+
+	// The server also set an HttpOnly cookie at login, which JavaScript cannot
+	// delete. Ask the server to expire it. Fire and forget - signing out of
+	// this tab should not wait on the network.
+	fetch(`${BASE}logout`, { method: 'POST' }).catch(() => {})
 }
 
 export function isLoggedIn(): boolean {

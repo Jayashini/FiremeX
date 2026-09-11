@@ -58,6 +58,7 @@ func ApproveUser(c *gin.Context) {
 
 	user.Status = "active"
 	database.DB.Save(&user)
+	forgetUser(user.ID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "User approved successfully",
@@ -86,6 +87,7 @@ func DenyUser(c *gin.Context) {
 
 	// Permanently delete (not soft delete) since they were never approved
 	database.DB.Unscoped().Delete(&user)
+	forgetUser(user.ID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "User denied and removed"})
 }
@@ -117,6 +119,7 @@ func RevokeUser(c *gin.Context) {
 
 	user.Status = "revoked"
 	database.DB.Save(&user)
+	forgetUser(user.ID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "User access revoked"})
 }

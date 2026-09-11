@@ -54,6 +54,9 @@ func main() {
 	// 5. Public Authentication Routes
 	router.POST("/login", controllers.Login)
 
+	// Public so an already-expired session can still clear its cookie.
+	router.POST("/logout", controllers.Logout)
+
 	// 5.1 Public Registration Routes
 	router.POST("/register/organization", controllers.RegisterOrganization)
 	router.POST("/register/operator", controllers.RegisterOperator)
@@ -73,6 +76,9 @@ func main() {
 		// Camera routes for authenticated users
 		protected.GET("/cameras", controllers.GetCameras)
 		protected.GET("/cameras/stream/:entity_id", controllers.StreamCamera)
+		// Single still frame. Used by the dashboard, because MJPEG does not
+		// work for RTSP cameras, and by the detection loop later.
+		protected.GET("/cameras/snapshot/:entity_id", controllers.SnapshotCamera)
 
 		// The logged-in user's own account (profile page)
 		protected.GET("/me", controllers.GetMe)
