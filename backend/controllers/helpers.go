@@ -2,11 +2,67 @@ package controllers
 
 import (
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/firemex/backend/database"
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 )
+
+// The dashboard asks for a camera frame several times a second, and every one
+// of those requests needs to know who is asking. Looking the user up in the
+// database each time means dozens of identical queries per second for a row
+// that changes perhaps once a month.
+//
+// So a user is remembered for a few seconds.
+//
+// The trade-off, stated plainly: revoking an operator, or changing their role,
+// takes effect within userCacheTTL rather than instantly. Five seconds is short
+// enough not to matter in practice - the operator's very next frame request is
+// already rejected - and long enough to remove almost all of the load.
+const userCacheTTL = 5 * time.Second
+
+type cachedUser struct {
+	user     models.User
+	cachedAt time.Time
+}
+
+var (
+	userCacheMu sync.RWMutex
+	userCache   = map[uint]cachedUser{}
+)
+
+func lookupUser(id uint) (models.User, bool) {
+	userCacheMu.RLock()
+	entry, ok := userCache[id]
+	userCacheMu.RUnlock()
+
+	if ok && time.Since(entry.cachedAt) < userCacheTTL {
+		return entry.user, true
+	}
+
+	var user models.User
+	if err := database.DB.First(&user, id).Error; err != nil {
+		return models.User{}, false
+	}
+
+	userCacheMu.Lock()
+	userCache[id] = cachedUser{user: user, cachedAt: time.Now()}
+	userCacheMu.Unlock()
+
+	return user, true
+}
+
+// forgetUser drops a cached user immediately.
+//
+// Called wherever an account is changed, so approving, revoking or renaming
+// somebody takes effect at once instead of after userCacheTTL.
+func forgetUser(id uint) {
+	userCacheMu.Lock()
+	delete(userCache, id)
+	userCacheMu.Unlock()
+}
 
 // FiremeX is organisation-based: a user may only ever see or change records
 // that belong to their own organisation. The two helpers below are how every
@@ -43,8 +99,8 @@ func currentUser(c *gin.Context) (models.User, bool) {
 		return models.User{}, false
 	}
 
-	var user models.User
-	if err := database.DB.First(&user, uint(id)).Error; err != nil {
+	user, found := lookupUser(uint(id))
+	if !found {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
 		c.Abort()
 		return models.User{}, false

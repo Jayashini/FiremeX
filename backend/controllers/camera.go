@@ -69,8 +69,7 @@ func GetAvailableCameras(c *gin.Context) {
 	req.Header.Set("Authorization", "Bearer "+haToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := haClient.Do(req)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to connect to Home Assistant: " + err.Error()})
 		return
@@ -236,8 +235,7 @@ func StreamCamera(c *gin.Context) {
 
 	req.Header.Set("Authorization", "Bearer "+haToken)
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := haStreamClient.Do(req)
 	if err != nil {
 		log.Printf("stream %s: could not reach Home Assistant: %v", entityID, err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": "Failed to connect to HA stream: " + err.Error()})
@@ -372,12 +370,28 @@ var (
 	snapshotBusy  = map[string]chan struct{}{}
 )
 
-// haClient is shared on purpose.
+// Two shared clients, on purpose.
 //
-// A new http.Client per request opens a new TCP connection every time and
-// throws it away. Reusing one keeps connections to Home Assistant alive, which
-// matters once the dashboard is asking several times a second per camera.
-var haClient = &http.Client{Timeout: 10 * time.Second}
+// Shared: a new http.Client per request opens a fresh TCP connection and throws
+// it away. Reusing one keeps connections to Home Assistant alive, which matters
+// once the dashboard asks several times a second per camera.
+//
+// Two of them, because the two kinds of request need opposite timeouts.
+var (
+	// haClient is for requests that finish: listing entities, fetching one
+	// frame. Timeout covers the whole exchange, so nothing can hang forever.
+	haClient = &http.Client{Timeout: 10 * time.Second}
+
+	// haStreamClient is for MJPEG, which is meant to stay open for hours. A
+	// total Timeout would cut the video off mid-stream, so only the wait for
+	// the FIRST response is bounded - after that the stream runs as long as it
+	// likes.
+	haStreamClient = &http.Client{
+		Transport: &http.Transport{
+			ResponseHeaderTimeout: 10 * time.Second,
+		},
+	}
+)
 
 // cachedSnapshot returns a recent frame, fetching a new one only when the
 // cached frame has aged out.
@@ -424,9 +438,25 @@ func cachedSnapshot(entityID string) ([]byte, string, error) {
 			err:         err,
 		}
 		delete(snapshotBusy, entityID)
+		evictStaleSnapshots()
 		snapshotMu.Unlock()
 		close(done)
 
 		return data, contentType, err
+	}
+}
+
+// snapshotRetention is how long an unused frame is kept before being dropped.
+// Without this the cache holds one frame - up to 10 MB - for every camera ever
+// requested, including cameras that were deleted months ago.
+const snapshotRetention = 30 * time.Second
+
+// evictStaleSnapshots drops frames nobody has asked for recently.
+// The caller must already hold snapshotMu.
+func evictStaleSnapshots() {
+	for entityID, entry := range snapshotCache {
+		if time.Since(entry.fetchedAt) > snapshotRetention {
+			delete(snapshotCache, entityID)
+		}
 	}
 }

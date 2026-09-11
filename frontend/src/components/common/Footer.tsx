@@ -9,10 +9,10 @@ export function Footer() {
 
 			<div class="flex items-center gap-6">
 
-				<div class="flex items-center gap-4">
-					<a href="#" onClick={(e) => { e.preventDefault(); alert('Opening Documentation...'); }} class="hover:text-accent transition-colors font-medium">Documentation</a>
-					<a href="#" onClick={(e) => { e.preventDefault(); alert('Opening Support...'); }} class="hover:text-accent transition-colors font-medium">Support</a>
-				</div>
+				{/* Documentation and Support links were here. Both only showed
+				    an alert saying they were opening something, which never
+				    happened. Removed until there is somewhere real to point at. */}
+				<span class="text-[11px] text-slate-600">v0.1 - development build</span>
 			</div>
 		</footer>
 	)

@@ -120,8 +120,9 @@ func UpdateMe(c *gin.Context) {
 		return
 	}
 
-	// The cached copy from earlier in this request is now stale.
+	// Both caches now hold the old name.
 	c.Set("currentUser", full)
+	forgetUser(full.ID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Profile updated",
@@ -172,6 +173,8 @@ func ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return
 	}
+
+	forgetUser(user.ID)
 
 	// Tokens are stateless, so sessions issued before this change stay valid
 	// until they expire. Say so rather than implying everything was signed out.
