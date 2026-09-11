@@ -1,3 +1,22 @@
+// Camera handling for FiremeX.
+//
+// FiremeX never talks to a camera directly. Home Assistant owns every camera,
+// whatever it is - a laptop webcam, an RTSP CCTV camera, an ONVIF unit - and
+// FiremeX reads them back out of Home Assistant. That is what makes the
+// product work with equipment a customer already has: if Home Assistant can
+// see it, FiremeX can monitor it.
+//
+// The flow:
+//
+//	GetAvailableCameras  ask Home Assistant what cameras exist
+//	AddCamera            save the ones this organisation wants to monitor
+//	GetCameras           list what was saved
+//	SnapshotCamera       fetch one picture, for the dashboard and later the detector
+//	StreamCamera         MJPEG passthrough - only works for MJPEG-native cameras
+//	DeleteCamera         stop monitoring one
+//
+// Every handler is scoped to the caller's organisation, so one customer can
+// never see or touch another customer's cameras.
 package controllers
 
 import (
@@ -16,15 +35,28 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// HAState represents state item returned from Home Assistant /api/states
+// HAState is one entity from Home Assistant's /api/states response.
+//
+// Home Assistant returns EVERY entity it knows about - lights, sensors,
+// switches, cameras - in one list. We only care about three fields, so the
+// rest of each entry is ignored rather than modelled.
 type HAState struct {
 	EntityID   string                 `json:"entity_id"`
 	State      string                 `json:"state"`
 	Attributes map[string]interface{} `json:"attributes"`
 }
 
-// GetAvailableCameras fetches all camera entities from Home Assistant API
+// GetAvailableCameras lists the cameras Home Assistant can see.
+//
+// This is what fills the dropdown on the Add Device page. It reads live from
+// Home Assistant rather than from our database, because the point is to show
+// cameras the organisation has NOT added yet.
+//
+// Admin-only: choosing what to monitor is an administrator's job.
 func GetAvailableCameras(c *gin.Context) {
+	// The address and token come from configuration, never from source code.
+	// The token is powerful - it can control everything in Home Assistant -
+	// so it lives only on the server and is never sent to a browser.
 	haURL := config.C.HAURL
 	haToken := config.C.HAToken
 
@@ -56,10 +88,15 @@ func GetAvailableCameras(c *gin.Context) {
 		return
 	}
 
-	// Filter for camera.* entities
+	// Home Assistant names entities as "<domain>.<name>", so every camera -
+	// regardless of which integration created it - starts with "camera.".
+	// That single rule is why FiremeX works with any camera type without
+	// knowing anything about the hardware.
 	var cameras []gin.H
 	for _, s := range states {
 		if len(s.EntityID) >= 7 && s.EntityID[:7] == "camera." {
+			// friendly_name is what the user typed in Home Assistant. Fall
+			// back to the raw entity id so the dropdown is never blank.
 			friendlyName, _ := s.Attributes["friendly_name"].(string)
 			if friendlyName == "" {
 				friendlyName = s.EntityID
@@ -75,7 +112,12 @@ func GetAvailableCameras(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"cameras": cameras})
 }
 
-// AddCamera saves a new camera into PostgreSQL linked to the user's organization
+// AddCamera records that this organisation wants to monitor a camera.
+//
+// Note what is NOT stored: no address, no credentials, no stream URL. Only the
+// Home Assistant entity id plus the organisation's own labels. Home Assistant
+// remains the single place where camera connection details live, so changing a
+// camera's password never requires touching FiremeX.
 func AddCamera(c *gin.Context) {
 	var input struct {
 		EntityID    string `json:"entity_id" binding:"required"`
@@ -110,7 +152,11 @@ func AddCamera(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Camera added successfully", "camera": camera})
 }
 
-// GetCameras fetches all cameras for the user's organization
+// GetCameras lists the cameras this organisation has added.
+//
+// Available to operators as well as admins - watching cameras is the
+// operator's whole job. The organisation filter is what keeps one customer's
+// camera list invisible to another.
 func GetCameras(c *gin.Context) {
 	orgID, ok := currentOrgID(c)
 	if !ok {
@@ -147,7 +193,20 @@ func DeleteCamera(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Camera deleted successfully"})
 }
 
-// StreamCamera proxies the Home Assistant MJPEG stream to avoid CORS issues in browser
+// StreamCamera proxies Home Assistant's MJPEG stream.
+//
+// MJPEG is just "one JPEG after another down a single connection", which an
+// <img> tag can display directly. It works well for cameras that already
+// produce JPEGs.
+//
+// It does NOT work for an RTSP camera: Home Assistant answers with MJPEG
+// headers, fails to transcode, and closes the connection a moment later - a
+// black tile. SnapshotCamera below is what the dashboard actually uses.
+// This is kept for MJPEG-native cameras and because it is cheap to leave.
+//
+// Why proxy at all instead of letting the browser talk to Home Assistant?
+// Two reasons: the browser has no Home Assistant token and should never be
+// given one, and a cross-origin video request would be blocked anyway.
 func StreamCamera(c *gin.Context) {
 	orgID, ok := currentOrgID(c)
 	if !ok {
@@ -270,8 +329,7 @@ func FetchSnapshot(entityID string) ([]byte, string, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+config.C.HAToken)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := haClient.Do(req)
 	if err != nil {
 		return nil, "", fmt.Errorf("could not reach Home Assistant: %w", err)
 	}
@@ -314,10 +372,12 @@ var (
 	snapshotBusy  = map[string]chan struct{}{}
 )
 
-// snapshotTTL is how long a frame is reused before a new one is fetched.
-// One second matches what a monitoring wall needs; the detection loop will
-// ask far less often than that.
-const snapshotTTL = time.Second
+// haClient is shared on purpose.
+//
+// A new http.Client per request opens a new TCP connection every time and
+// throws it away. Reusing one keeps connections to Home Assistant alive, which
+// matters once the dashboard is asking several times a second per camera.
+var haClient = &http.Client{Timeout: 10 * time.Second}
 
 // cachedSnapshot returns a recent frame, fetching a new one only when the
 // cached frame has aged out.
@@ -339,7 +399,7 @@ func cachedSnapshot(entityID string) ([]byte, string, error) {
 	for {
 		snapshotMu.Lock()
 
-		if entry, ok := snapshotCache[entityID]; ok && time.Since(entry.fetchedAt) < snapshotTTL {
+		if entry, ok := snapshotCache[entityID]; ok && time.Since(entry.fetchedAt) < config.C.SnapshotTTL {
 			snapshotMu.Unlock()
 			return entry.data, entry.contentType, entry.err
 		}

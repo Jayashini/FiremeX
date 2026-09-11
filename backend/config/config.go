@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // SessionCookie is the name of the cookie that carries the login token.
@@ -36,6 +37,12 @@ type Config struct {
 	HAToken     string   // token used to call the Home Assistant API
 	CORSOrigins []string // browser origins allowed to call this API
 	DataDir     string   // folder for files FiremeX must keep (e.g. the secret)
+
+	// SnapshotTTL is how long one camera frame is reused before a fresh one is
+	// fetched. It is the ceiling on the dashboard's frame rate: at 1s nothing
+	// can ever show more than 1 frame per second, however fast the camera is.
+	// Lower means smoother video and more load on Home Assistant.
+	SnapshotTTL time.Duration
 }
 
 // C is the one shared copy of the configuration.
@@ -59,6 +66,7 @@ func Load() {
 		HAToken:     env("HA_TOKEN", ""),
 		CORSOrigins: splitCSV(env("CORS_ORIGINS", "http://localhost:5173")),
 		DataDir:     dataDir,
+		SnapshotTTL: duration("SNAPSHOT_TTL_MS", 200*time.Millisecond),
 	}
 	C.JWTSecret = []byte(resolveSecret(dataDir))
 
@@ -118,6 +126,20 @@ func resolveSecret(dataDir string) string {
 		log.Println("config: generated a new signing secret at", path)
 	}
 	return secret
+}
+
+// duration reads a millisecond value from the environment.
+func duration(key string, fallback time.Duration) time.Duration {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return fallback
+	}
+	ms, err := time.ParseDuration(raw + "ms")
+	if err != nil || ms <= 0 {
+		log.Printf("config: ignoring invalid %s=%q, using %v", key, raw, fallback)
+		return fallback
+	}
+	return ms
 }
 
 // env returns the environment value for key, or fallback when it is unset.
