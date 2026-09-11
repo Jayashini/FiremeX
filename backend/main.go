@@ -29,7 +29,14 @@ func main() {
 	database.ConnectDB()
 
 	// 2. Run the AutoMigrate for all models
-	err := database.DB.AutoMigrate(&models.Organization{}, &models.User{}, &models.Camera{})
+	// Order matters: a table is created after the tables it points at, so
+	// Incident - which references both Camera and User - comes last.
+	err := database.DB.AutoMigrate(
+		&models.Organization{},
+		&models.User{},
+		&models.Camera{},
+		&models.Incident{},
+	)
 	if err != nil {
 		log.Fatal("Failed to migrate database: ", err)
 	}
