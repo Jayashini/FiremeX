@@ -1,21 +1,17 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e
 
-# Check if homeassistant container exists
-if docker inspect homeassistant >/dev/null 2>&1; then
-    HA_IMAGE=$(docker inspect --format="{{.Config.Image}}" homeassistant)
-    echo "Found existing Home Assistant container using image: $HA_IMAGE"
-    echo "HOMEASSISTANT_IMAGE=$HA_IMAGE" > .env
-else
-    # Check if any homeassistant image exists locally
-    LOCAL_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep "home-assistant" | head -n 1)
-    
-    if [ -n "$LOCAL_IMAGE" ]; then
-        echo "Found local Home Assistant image: $LOCAL_IMAGE"
-        echo "HOMEASSISTANT_IMAGE=$LOCAL_IMAGE" > .env
-    else
-        echo "Home Assistant not found locally. Using default ghcr.io/home-assistant/home-assistant:stable."
-        echo "HOMEASSISTANT_IMAGE=ghcr.io/home-assistant/home-assistant:stable" > .env
-    fi
-fi
+echo "========================================================"
+echo "  Starting All FiremeX Containers with Docker Compose   "
+echo "========================================================"
 
-docker compose up -d
+docker compose up -d --build
+
+echo "========================================================"
+echo "  All FiremeX Containers Started Successfully!"
+echo "  - Home Assistant    : http://localhost:8123"
+echo "  - Frontend UI       : http://localhost:5173"
+echo "  - Backend API       : http://localhost:8080"
+echo "  - AI Model Service  : http://localhost:8100/health"
+echo "  - PostgreSQL DB     : localhost:5432"
+echo "========================================================"

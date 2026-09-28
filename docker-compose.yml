@@ -1,4 +1,5 @@
 services:
+  # 1. Home Assistant Container
   homeassistant:
     container_name: homeassistant
     image: ${HOMEASSISTANT_IMAGE:-ghcr.io/home-assistant/home-assistant:stable}
@@ -10,7 +11,7 @@ services:
     ports:
       - "8123:8123"
 
-  # --- POSTGRES DATABASE ---
+  # 2. Database Container (PostgreSQL)
   db:
     container_name: firemex_db
     image: postgres:15-alpine
@@ -23,6 +24,52 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  # 3. AI Model Container (FastAPI + YOLO)
+  firemex-model:
+    container_name: firemex_model
+    build:
+      context: ./firemex-model
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    environment:
+      - PORT=8100
+
+  # 4. Backend Container (Go + Gin)
+  firemex-backend:
+    container_name: firemex_backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=admin
+      - DB_PASSWORD=secretpassword
+      - DB_NAME=firemex
+      - HA_URL=http://homeassistant:8123
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:80,http://localhost:8123
+    depends_on:
+      - db
+      - firemex-model
+
+  # 5. Frontend Container (Preact + Nginx)
+  firemex-frontend:
+    container_name: firemex_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - firemex-backend
 
 volumes:
   postgres_data:
