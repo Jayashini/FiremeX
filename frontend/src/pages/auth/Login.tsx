@@ -77,6 +77,7 @@ export function Login({ onNavigate, onSignedIn }: Props) {
 						type="email"
 						value={email}
 						onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
+						placeholder="name@company.com"
 						class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
 						required
 					/>
@@ -95,6 +96,7 @@ export function Login({ onNavigate, onSignedIn }: Props) {
 							type={showPassword ? 'text' : 'password'}
 							value={password}
 							onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
+							placeholder="Enter Password"
 							class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl pl-4 pr-11 py-3.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
 							required
 						/>
@@ -117,7 +119,7 @@ export function Login({ onNavigate, onSignedIn }: Props) {
 					</div>
 				</div>
 
-			{error && ( <p class="text-sm font-semibold text-red-500 text-center mb-2 animate-pulse">{error}</p>)}
+				{error && (<p class="text-sm font-semibold text-red-500 text-center mb-2 animate-pulse">{error}</p>)}
 
 				{/* Submit Button */}
 				<button
