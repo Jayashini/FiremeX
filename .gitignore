@@ -73,3 +73,19 @@ auto.key
 # MediaMTX dev config - contains a stream password
 mediamtx.yml
 !mediamtx.yml.example
+
+# --- Python detection service ---
+# The virtual environment: hundreds of MB of PyTorch, rebuilt from
+# requirements.txt on any machine. Never belongs in git.
+firemex-model/.venv/
+firemex-model/venv/
+__pycache__/
+*.pyc
+
+# Annotated output written by try_model.py and annotate.py's self test
+firemex-model/*_detected.jpg
+firemex-model/annotate_sample.jpg
+
+# --- Incident evidence photos (written at runtime, not source) ---
+backend/incidents/
+backend/data/
