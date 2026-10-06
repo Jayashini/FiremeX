@@ -3,11 +3,14 @@ import os
 import re
 import subprocess
 import sys
+import time
 from urllib.parse import quote
 
-mode = sys.argv[1]
 if len(sys.argv) < 3:
     sys.exit('Usage: publish-camera.sh --list | DEVICE, or publish-video.sh CLIP')
+mode = sys.argv[1]
+if mode not in ('camera', 'replay'):
+    sys.exit('Publisher mode must be camera or replay')
 source = sys.argv[2]
 if mode == 'camera' and source == '--list':
     subprocess.run(['ffmpeg', '-hide_banner', '-f', 'avfoundation', '-list_devices', 'true', '-i', ''])
@@ -24,7 +27,8 @@ url = f'rtsp://{quote(user, safe="")}:{quote(password, safe="")}@{host}/{path}'
 command = ['ffmpeg', '-hide_banner', '-loglevel', 'warning', '-nostdin']
 if mode == 'camera':
     command += ['-f', 'avfoundation', '-framerate', os.environ.get('CAMERA_FPS', '30'),
-                '-video_size', os.environ.get('CAMERA_SIZE', '1280x720'), '-i', source + ':none']
+                '-video_size', os.environ.get('CAMERA_SIZE', '1280x720'),
+                '-pixel_format', 'nv12', '-i', source + ':none']
 else:
     if not os.path.isfile(source):
         sys.exit('Replay clip not found')
@@ -32,14 +36,17 @@ else:
 command += ['-an', '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency',
             '-pix_fmt', 'yuv420p', '-g', '30', '-rtsp_transport', 'tcp', '-f', 'rtsp', url]
 print(f'Publishing {"Recorded replay" if mode == "replay" else "Selected camera"} to {path}. Ctrl-C stops capture.', flush=True)
-process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
 try:
-    for line in process.stderr:
-        print(line.replace(url, '[authenticated RTSP stream]').replace(quote(password, safe=''), '[redacted]').replace(password, '[redacted]'), end='', flush=True)
-    code = process.wait()
-    if code and mode == 'camera':
-        print('Check macOS camera permission for this host app and device-supported size/FPS.', file=sys.stderr)
-    sys.exit(code)
+    while True:
+        process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        for line in process.stderr:
+            print(line.replace(url, '[authenticated RTSP stream]').replace(quote(password, safe=''), '[redacted]').replace(password, '[redacted]'), end='', flush=True)
+        code = process.wait()
+        if mode == 'camera' and code:
+            print('Check macOS camera permission for this host app and device-supported size/FPS.', file=sys.stderr)
+        print(f'Publisher stopped (exit {code}); retrying in 2 seconds. Ctrl-C stops.', flush=True)
+        time.sleep(2)
 except KeyboardInterrupt:
-    process.terminate()
-    process.wait(timeout=10)
+    if process.poll() is None:
+        process.terminate()
+        process.wait(timeout=10)

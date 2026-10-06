@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
 import { API } from '../../api'
-import { CameraFrame } from '../../components/common/CameraFrame'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -217,23 +216,15 @@ export function AddDevice({ onNavigate }: Props) {
 						</div>
 					</div>
 
-					{/* Test Connection Preview Block */}
+					{/* Preview is available after enrollment: the snapshot API is scoped to saved cameras. */}
 					<div class="border border-[#8B949E]/10 rounded-2xl p-5 mb-8 bg-[#050B0D]/50 flex flex-col items-center justify-center gap-4">
 						<div class="w-full aspect-video rounded-xl bg-[#050B0D] border border-[#8B949E]/10 flex flex-col items-center justify-center gap-3 text-slate-500 overflow-hidden relative">
-							{selectedEntityId ? (
-								<CameraFrame
-									entityId={selectedEntityId}
-									alt="HA Camera Preview"
-									className="w-full h-full object-cover"
-								/>
-							) : (
-								<>
-									<svg class="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-									</svg>
-									<span class="text-xs font-mono tracking-wider">NO ACTIVE STREAM SELECTED</span>
-								</>
-							)}
+							<svg class="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+							</svg>
+							<span class="text-xs font-mono tracking-wider text-center px-4">
+								{selectedEntityId ? 'Live preview starts after adding this camera.' : 'Select a camera to add.'}
+							</span>
 						</div>
 					</div>
 

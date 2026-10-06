@@ -38,6 +38,11 @@ async def lifespan(app):
     model = YOLO(MODEL_PATH)
     if set(model.names.values()) != {"fire", "smoke"}:
         raise ValueError("Model must have exactly fire and smoke classes")
+    # The first CPU prediction can spend tens of seconds initializing kernels.
+    # Do that before health reports ready, so the first monitored frame has the
+    # same bounded latency as later frames.
+    model(Image.new("RGB", (640, 480), (32, 32, 32)),
+          conf=CONFIDENCE_THRESHOLD, device="cpu", verbose=False)
     yield
 
 

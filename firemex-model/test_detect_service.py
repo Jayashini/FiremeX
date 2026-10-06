@@ -76,6 +76,15 @@ class Contract(unittest.TestCase):
         self.assertEqual(self.post().status_code, 503)
         release.set(); thread.join()
 
+    def test_startup_warms_model_before_health(self):
+        fake = FakeModel()
+        with patch.object(service, 'YOLO', return_value=fake):
+            with TestClient(service.app) as client:
+                health = client.get('/health')
+                self.assertTrue(health.json()['ok'])
+                self.assertEqual(fake.kwargs['device'], 'cpu')
+                self.assertEqual(fake.kwargs['conf'], service.CONFIDENCE_THRESHOLD)
+
 
 if __name__ == '__main__':
     unittest.main()

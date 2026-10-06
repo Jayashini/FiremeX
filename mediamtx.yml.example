@@ -24,6 +24,7 @@ rtmp: no
 hls: no
 webrtc: no
 srt: no
+moq: no
 
 # 2. One account, allowed to publish and read the named demo paths.
 authInternalUsers:
