@@ -1,370 +1,67 @@
 import { useEffect, useState } from 'preact/hooks'
 import { API } from '../../api'
+import { authHeaders } from '../../session'
 import { CameraFrame } from '../../components/common/CameraFrame'
+import type { DetectorStatus } from '../../types/incident'
 
-type Props = {
-	onNavigate: (path: string) => void
-	/** Operators watch cameras but do not add or remove them. */
-	readOnly?: boolean
-}
-
-
+type Camera = { ID: number; display_name: string; zone: string; entity_id: string; ai_enabled: boolean }
+type Props = { onNavigate: (path: string) => void; readOnly?: boolean }
 export function Livefeed({ onNavigate, readOnly = false }: Props) {
-	const [cameras, setCameras] = useState<any[]>([])
-	const [loaded, setLoaded] = useState(false)
-	const [layout, setLayout] = useState<'2x2' | '1x2'>('2x2')
-	const [timeStr, setTimeStr] = useState('')
-
-	// Fetch real cameras from API
-	const fetchCameras = async () => {
-		try {
-			const token = localStorage.getItem('firemex_token')
-			if (!token) return
-
-			const res = await fetch(`${API}cameras`, {
-				headers: { Authorization: `Bearer ${token}` }
-			})
-
-			if (!res.ok) return
-			const data = await res.json()
-
-			{
-				// Only fields that come from somewhere real. Frame rate and
-				// resolution used to be hardcoded here as "30 fps" and "1080p"
-				// for every camera, which was simply untrue - this webcam is
-				// 720p at about 5 fps. Home Assistant does not report either,
-				// so rather than invent them we do not show them.
-				const mapped = (data.cameras ?? []).map((c: any, index: number) => ({
-					id: `CAM-${String(index + 1).padStart(2, '0')}`,
-					db_id: c.ID,
-					name: c.display_name,
-					zone: c.zone || 'Default Zone',
-					entity_id: c.entity_id,
-					aiEnabled: c.ai_enabled,
-					// status stays 'Normal' until the detection loop sets it.
-					status: 'Normal'
-				}))
-				setCameras(mapped)
-			}
-		} catch (err) {
-			console.error('Failed to fetch cameras from backend:', err)
-		} finally {
-			setLoaded(true)
-		}
-	}
-
-
-	useEffect(() => {
-		fetchCameras()
-	}, [])
-
-	// Real-time ticking clock for premium effect
-	useEffect(() => {
-		const updateTime = () => {
-			const now = new Date()
-			const hours = String(now.getHours()).padStart(2, '0')
-			const mins = String(now.getMinutes()).padStart(2, '0')
-			const secs = String(now.getSeconds()).padStart(2, '0')
-			setTimeStr(`${hours} : ${mins} : ${secs}`)
-		}
-		updateTime()
-		const interval = setInterval(updateTime, 1000)
-		return () => clearInterval(interval)
-	}, [])
-
-	const handleDeleteCamera = async (camera: any) => {
-		if (camera.db_id) {
-			try {
-				const token = localStorage.getItem('firemex_token')
-				await fetch(`${API}cameras/${camera.db_id}`, {
-					method: 'DELETE',
-					headers: { Authorization: `Bearer ${token}` }
-				})
-			} catch (err) {
-				console.error('Failed to delete camera:', err)
-			}
-		}
-		setCameras((prev) => prev.filter((c) => c.id !== camera.id))
-	}
-
-	return (
-		<div class="flex flex-col gap-6 w-full pb-8">
-			{/* Page Header */}
-			<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0 bg-brand-surface border-b border-[#8B949E]/10 p-4 pl-10">
-				<div>
-					<h1 class="text-2xl font-bold text-slate-100">Live Feed</h1>
-					<p class="text-sm text-[#8B949E] mt-1">{cameras.length} {cameras.length === 1 ? 'camera' : 'cameras'} connected</p>
-				</div>
-				<div class="flex items-center gap-3 self-end sm:self-auto">
-					{/* Live Ticker */}
-					<div class="flex items-center gap-2 bg-[#050B0D] border border-emerald-500/20 px-4 py-2 rounded-xl text-emerald-400 font-mono text-sm tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.05)]">
-						<span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-						<span class="font-semibold">LIVE</span>
-						<span class="text-slate-400">|</span>
-						<span>{timeStr || '00 : 00 : 00'}</span>
-					</div>
-
-					{/* Notification Bell */}
-					<button
-						type="button"
-						class="relative flex items-center justify-center w-10 h-10 bg-brand-surface border border-brand-border hover:border-accent/40 rounded-xl text-slate-400 hover:text-slate-200 transition-colors"
-						onClick={() => onNavigate(readOnly ? '/FiremeX/operator/incidents' : '/FiremeX/admin/alerts')}
-					>
-						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-						</svg>
-					</button>
-				</div>
-			</header>
-
-			{/* Secondary Controls Header */}
-			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 m-6">
-				<div class="flex items-center gap-2">
-					<span class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Camera Grid</span>
-					<span class="text-xs text-slate-600">|</span>
-					<span class="text-xs text-slate-500">All zones</span>
-				</div>
-
-				<div class="flex items-center gap-4">
-					{/* Layout Switcher */}
-					<div class="flex items-center gap-2 bg-brand-surface border border-brand-border rounded-xl p-1 text-xs">
-						<span class="text-slate-500 px-2 select-none">Layout</span>
-						<button
-							type="button"
-							class={`px-3 py-1.5 rounded-lg font-semibold transition-all ${layout === '2x2'
-								? 'bg-slate-200 text-brand-bg shadow'
-								: 'text-slate-400 hover:text-slate-200'
-								}`}
-							onClick={() => setLayout('2x2')}
-						>
-							2 × 2
-						</button>
-						<button
-							type="button"
-							class={`px-3 py-1.5 rounded-lg font-semibold transition-all ${layout === '1x2'
-								? 'bg-slate-200 text-brand-bg shadow'
-								: 'text-slate-400 hover:text-slate-200'
-								}`}
-							onClick={() => setLayout('1x2')}
-						>
-							1 × 2
-						</button>
-					</div>
-
-					{/* Add Camera Button - administrators only */}
-					{!readOnly && (
-						<button
-							type="button"
-							class="flex items-center gap-2 bg-accent/10 border border-accent hover:border-accent/40 text-accent font-bold text-xs px-4 py-3 rounded-md transition-all shadow-md shadow-accent/20"
-							onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
-						>
-							<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-							</svg>
-							<span>Add Camera</span>
-						</button>
-					)}
-				</div>
-			</div>
-
-			{/* Camera Grid Layout */}
-			<section
-				class={`grid gap-6 transition-all duration-300 m-6 mt-0 ${layout === '2x2'
-					? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
-					: 'grid-cols-1 md:grid-cols-2'
-					}`}
-			>
-				{cameras.map((camera: any) => {
-					// Always false for now: nothing sets a camera to 'Critical'
-					// yet. The detection loop will, and every piece of styling
-					// below that reacts to it then comes alive. Kept rather
-					// than deleted because it is the shape the next phase needs.
-					const isCritical = camera.status === 'Critical'
-					return (
-						<article
-							key={camera.id}
-							class={`flex flex-col gap-4 bg-[#0B1315]/40 border rounded-3xl p-5 transition-all ${isCritical
-								? 'border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)] animate-pulse-ring'
-								: 'border-[#8B949E]/10 hover:border-[#8B949E]/20'
-								}`}
-						>
-							{/* Video Frame Preview */}
-							<div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#050B0D] border border-[#8B949E]/10 flex items-center justify-center group">
-								{/* Live frames from Home Assistant */}
-								{camera.entity_id ? (
-									<CameraFrame
-										entityId={camera.entity_id}
-										alt={camera.name}
-										className="w-full h-full object-cover z-0"
-									/>
-								) : null}
-
-								{/* Placeholder grid lines to simulate inactive stream */}
-								<div class="absolute inset-0 bg-[linear-gradient(rgba(14,23,26,0.5)_1px,transparent_1px),linear-gradient(90deg,rgba(14,23,26,0.5)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none -z-10" />
-
-								{/* Dynamic Glow for Critical alert */}
-								{isCritical && (
-									<div class="absolute inset-0 bg-radial from-red-600/15 to-transparent pointer-events-none" />
-								)}
-
-								{/* Static Video Camera Icon in Center (shows if stream not rendered) */}
-								{!camera.entity_id && (
-									<svg class={`w-12 h-12 text-slate-800 transition-transform group-hover:scale-110 duration-300 ${isCritical ? 'text-red-900/40' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-									</svg>
-								)}
-
-								{/* Critical overlay badge */}
-								{isCritical && (
-									<div class="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center bg-red-600 border border-red-500 px-3 py-1.5 rounded-xl text-white text-[10px] font-bold tracking-wider shadow-lg uppercase animate-pulse">
-										{/* No confidence number until a real detection
-										    supplies one - 98.4% was invented. */}
-										🔥 FIRE DETECTED
-									</div>
-								)}
-
-								{/* Top-left pill */}
-								<div class="absolute top-4 left-4 flex items-center gap-2 bg-[#050B0D]/80 border border-[#8B949E]/10 px-3 py-1.5 rounded-lg text-xs backdrop-blur-sm select-none font-semibold">
-									<span class="text-accent font-bold font-mono">{camera.id}</span>
-									<span class="text-slate-300 font-medium">{camera.name}</span>
-								</div>
-
-								{/* Top-right pill */}
-								{isCritical ? (
-									<span class="absolute top-4 right-4 flex items-center gap-1.5 border border-red-500 bg-red-500/5 px-3 py-1 rounded-lg text-xs font-bold text-red-500 backdrop-blur-sm select-none">
-										<svg class="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-										</svg>
-										Critical
-									</span>
-								) : (
-									<span class="absolute top-4 right-4 flex items-center gap-1.5 border border-emerald-500 bg-emerald-500/5 px-3 py-1 rounded-lg text-xs font-bold text-emerald-500 backdrop-blur-sm select-none">
-										<svg class="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-											<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-										</svg>
-										Online
-									</span>
-								)}
-
-								{/* Bottom-left: the live clock. This used to show the time
-								    the page was loaded, frozen, which looked like a
-								    timestamp on the video and was not one. */}
-								<div class="absolute bottom-4 left-4 flex items-center gap-2 text-xs font-mono text-slate-400 select-none">
-									<span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-									<span>{timeStr}</span>
-								</div>
-
-								{/* Bottom-right overlay: whether this camera is marked for
-								    fire detection. Real information, unlike the
-								    hardcoded resolution and frame rate this replaced. */}
-								<div class="absolute bottom-4 right-4 text-xs font-mono select-none">
-									{camera.aiEnabled ? (
-										<span class="text-accent">AI monitoring</span>
-									) : (
-										<span class="text-slate-600">AI off</span>
-									)}
-								</div>
-							</div>
-
-							{/* Description & Controls */}
-							<div class="flex items-start justify-between mt-4">
-								<div class="flex flex-col gap-0.5">
-									<span class="text-sm font-semi-bold text-slate-300 group-hover:text-slate-50">{camera.name}</span>
-									<span class="text-xs font-mono text-slate-200">Zone: {camera.zone}</span>
-								</div>
-								<div class="flex items-center gap-3 text-slate-400">
-									{!readOnly && (
-										<button
-											type="button"
-											class="hover:text-red-400 transition-colors p-1"
-											onClick={() => handleDeleteCamera(camera)}
-										>
-											<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-												<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-											</svg>
-										</button>
-									)}
-								</div>
-							</div>
-
-							<hr class="border-[#8B949E]/10 my-1" />
-
-							{/* Footer Status Meta */}
-							<div class="grid grid-cols-2 gap-4 text-xs mt-1 ml-15">
-								<div>
-									<span class="text-slate-500 font-mono block mb-1">HA Entity</span>
-									<span class="font-mono text-sm text-slate-200">{camera.entity_id}</span>
-								</div>
-								<div>
-									<span class="text-slate-500 font-mono block mb-1">Status</span>
-									<span class={`flex items-center gap-1.5 font-semibold text-sm ${isCritical ? 'text-red-400' : 'text-emerald-400'}`}>
-										{isCritical ? (
-											<>
-												<svg class="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-												</svg>
-												Critical
-											</>
-										) : (
-											<>
-												<svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-													<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-												</svg>
-												Online
-											</>
-										)}
-									</span>
-								</div>
-							</div>
-						</article>
-					)
-				})}
-
-				{/* Add New Camera Dotted Card - administrators only, and only
-				    alongside existing cameras; the empty state covers the rest */}
-				{!readOnly && cameras.length > 0 && (
-					<button
-						type="button"
-						class="flex flex-col items-center justify-center gap-3 bg-accent/5 hover:bg-accent/10 border border-dashed border-accent/30 hover:border-accent/50 rounded-3xl p-8 min-h-[310px] text-center transition-all duration-300"
-						onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
-					>
-						<div class="p-4 bg-[#050B0D] border border-accent/20 rounded-2xl text-accent shadow-md">
-							<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-								<path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-							</svg>
-						</div>
-						<div>
-							<h3 class="text-slate-200 font-bold text-base">Add New Camera</h3>
-							<p class="text-slate-500 text-xs mt-1">Configure a new device stream</p>
-						</div>
-					</button>
-				)}
-			</section>
-
-			{/* Nothing to show yet - say so rather than leaving a blank grid */}
-			{loaded && cameras.length === 0 && (
-				<div class="flex flex-col items-center justify-center gap-3 text-center mx-6 py-16 border border-dashed border-brand-border rounded-3xl">
-					<svg class="w-10 h-10 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-					</svg>
-					<h3 class="text-slate-300 font-semibold">No cameras yet</h3>
-					<p class="text-sm text-slate-500 max-w-sm">
-						{readOnly
-							? 'Your administrator has not added any cameras to FiremeX yet.'
-							: 'Connect a camera to Home Assistant, then add it here to start monitoring it.'}
-					</p>
-					{!readOnly && (
-						<button
-							type="button"
-							onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}
-							class="mt-2 bg-accent hover:bg-accent-hover font-semibold text-[#04201C] py-2.5 px-5 rounded-xl text-sm transition-all"
-						>
-							Add your first camera
-						</button>
-					)}
-				</div>
-			)}
-		</div>
-	)
+ const [cameras, setCameras] = useState<Camera[]>([])
+ const [statuses, setStatuses] = useState<DetectorStatus[]>([])
+ const [error, setError] = useState('')
+ const [warning, setWarning] = useState('')
+ const [loaded, setLoaded] = useState(false)
+ const [busy, setBusy] = useState<number | null>(null)
+ const [refresh, setRefresh] = useState(0)
+ useEffect(() => {
+  let stopped = false, running = false, timer = 0
+  let abort: AbortController | null = null
+  async function load() {
+   if (stopped || running || document.hidden) return
+   running = true; abort = new AbortController()
+   const timeout = window.setTimeout(() => abort?.abort(), 15000)
+   try {
+    const options = { headers: authHeaders(), credentials: 'include' as const, signal: abort.signal }
+    const [cr, sr] = await Promise.all([fetch(`${API}cameras`, options), fetch(`${API}detection/status`, options)])
+    if (!cr.ok || !sr.ok) throw new Error('Camera or detector status unavailable')
+    const [cd, sd] = await Promise.all([cr.json(), sr.json()])
+    if (!stopped) { setCameras(cd.cameras ?? []); setStatuses(sd.cameras ?? []); setWarning(sd.storage_warning || sd.discovery_warning || ''); setError('') }
+   } catch (err) { if (!stopped) setError(err instanceof Error ? err.message : 'Status unavailable') }
+   finally { window.clearTimeout(timeout); running = false; if (!stopped) { setLoaded(true); if (!document.hidden) timer = window.setTimeout(load, 2000) } }
+  }
+  function visibility() { window.clearTimeout(timer); if (!document.hidden) void load() }
+  document.addEventListener('visibilitychange', visibility); void load()
+  return () => { stopped = true; window.clearTimeout(timer); abort?.abort(); document.removeEventListener('visibilitychange', visibility) }
+ }, [refresh])
+ async function mutate(camera: Camera, remove = false) {
+  if (remove && !window.confirm(`Remove ${camera.display_name}?`)) return
+  setBusy(camera.ID)
+  try {
+   const response = await fetch(`${API}cameras/${camera.ID}${remove ? '' : '/detection'}`, { method: remove ? 'DELETE' : 'PATCH', headers: authHeaders(), credentials: 'include', body: remove ? undefined : JSON.stringify({ ai_enabled: !camera.ai_enabled }) })
+   if (!response.ok) throw new Error(`Camera update failed (HTTP ${response.status})`)
+   setRefresh(n => n + 1)
+  } catch (err) { setError(err instanceof Error ? err.message : 'Camera update failed') }
+  finally { setBusy(null) }
+ }
+ return <div class="p-6 space-y-6">
+  <header class="flex justify-between gap-4"><div><p class="text-accent text-xs uppercase tracking-widest">Camera monitoring</p><h1 class="text-3xl font-bold mt-2">Live Feed</h1><p class="text-slate-400 mt-2">AI runs in the backend, including while this page is closed.</p></div>{!readOnly && <button class="text-accent" onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}>+ Add camera</button>}</header>
+  {error && <p role="alert" class="text-amber-300">{error}. Displayed status may be stale.</p>}
+  {warning && <p role="alert" class="text-amber-300">{warning}</p>}
+  <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">{cameras.map(camera => {
+   const status = statuses.find(s => s.camera_id === camera.ID)
+   const state = error ? 'status unavailable' : status?.state ?? 'starting'
+   return <article key={camera.ID} class="border border-brand-border bg-brand-surface rounded-2xl overflow-hidden">
+    <div class="relative aspect-video bg-black"><CameraFrame entityId={camera.entity_id} alt={camera.display_name} className="w-full h-full object-contain" /><span class="absolute top-3 left-3 bg-black/80 px-3 py-1 rounded-lg">{camera.display_name}</span></div>
+    <div class="p-5 space-y-3"><div class="flex justify-between gap-3"><h2 class="font-semibold">{camera.display_name} · {camera.zone || 'No zone'}</h2><span class={state === 'monitoring' ? 'text-accent' : 'text-amber-300'}>{state}</span></div>
+     <p class="text-xs text-slate-400">{camera.entity_id} · AI {camera.ai_enabled ? 'enabled' : 'disabled'}</p>
+     {status?.failure && <p class="text-amber-300 text-sm">{status.failure}</p>}
+     <p class="text-xs text-slate-400">Last inference: {status?.last_inference_completion ? new Date(status.last_inference_completion).toLocaleTimeString() : 'Not yet completed'} · Processing: {status?.duration_ms ?? 0} ms · Lost results: {status?.lost_results ?? 0}</p>
+     <p class="text-xs text-slate-500">Monitoring describes processing health. A sample without detections does not establish that the scene is safe.</p>
+     {!readOnly && <div class="flex gap-5 text-sm"><button disabled={busy === camera.ID} class="text-accent" onClick={() => mutate(camera)}>{camera.ai_enabled ? 'Disable AI' : 'Enable AI'}</button><button disabled={busy === camera.ID} class="text-red-400" onClick={() => mutate(camera, true)}>Remove camera</button></div>}
+    </div>
+   </article>
+  })}</section>
+  {loaded && cameras.length === 0 && <p class="text-center py-16 text-slate-400">No cameras enrolled. {readOnly ? 'Ask your administrator to add a camera.' : 'Add a Home Assistant camera to begin.'}</p>}
+ </div>
 }

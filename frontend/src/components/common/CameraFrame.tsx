@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { API } from '../../api'
 
 type Props = {
@@ -28,8 +28,11 @@ export function CameraFrame({ entityId, className, alt, interval = 200 }: Props)
 	const [frame, setFrame] = useState(0)
 	const [failed, setFailed] = useState(false)
 
-	const scheduleNext = () => {
-		window.setTimeout(() => setFrame((n) => n + 1), interval)
+	const timer = useRef(0)
+ useEffect(() => () => window.clearTimeout(timer.current), [])
+ const scheduleNext = () => {
+		window.clearTimeout(timer.current)
+		timer.current = window.setTimeout(() => setFrame((n) => n + 1), interval)
 	}
 
 	return (

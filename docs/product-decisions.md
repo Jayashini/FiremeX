@@ -14,7 +14,7 @@ Recorded 6 October 2026 from the project owner's answers. Read this alongside th
 | Detection events | Create alerts/incidents when fire or smoke is detected; do not wait for human confirmation to record the machine report. |
 | Evidence | Detection images, retained for seven days. Video recording is not requested. |
 | Team roles | User mainly owns backend development; another team member owns ML. Coordinate model behavior, sample footage and provenance with that teammate. |
-| Immediate priority | Before the wider product roadmap, demonstrate computer camera/video source → existing ML model → persistent incident in the real incident table to the supervisor. User currently requests a detailed implementation plan, not implementation. |
+| Immediate priority | Before the wider product roadmap, demonstrate computer camera/video source → existing ML model → persistent incident in the real incident table to the supervisor. Implementation authorized on 6 October 2026 by “Run this plan.” |
 
 ## User preferences requiring further definition
 

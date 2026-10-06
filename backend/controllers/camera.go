@@ -26,11 +26,11 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/firemex/backend/config"
 	"github.com/firemex/backend/database"
+	"github.com/firemex/backend/internal/cameras"
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 )
@@ -176,10 +176,14 @@ func DeleteCamera(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id := c.Param("id")
+	id, err := positive(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid camera ID"})
+		return
+	}
 
 	var camera models.Camera
-	if err := database.DB.Where("organization_id = ?", orgID).First(&camera, id).Error; err != nil {
+	if err := database.DB.Where("organization_id = ? AND id = ?", orgID, id).First(&camera).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Camera not found"})
 		return
 	}
@@ -189,6 +193,9 @@ func DeleteCamera(c *gin.Context) {
 		return
 	}
 
+	if Detector != nil {
+		Detector.Cancel(id)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Camera deleted successfully"})
 }
 
@@ -301,7 +308,7 @@ func SnapshotCamera(c *gin.Context) {
 		return
 	}
 
-	image, contentType, err := cachedSnapshot(entityID)
+	frame, err := Snapshots.Get(c.Request.Context(), entityID)
 	if err != nil {
 		log.Printf("snapshot %s: %v", entityID, err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -311,152 +318,10 @@ func SnapshotCamera(c *gin.Context) {
 	// Every request must reach Home Assistant, never a cached copy - otherwise
 	// the "live" feed freezes on the first frame.
 	c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
-	c.Data(http.StatusOK, contentType, image)
+	c.Data(http.StatusOK, frame.ContentType, frame.Data)
 }
 
-// FetchSnapshot pulls a single frame from Home Assistant.
-//
-// Exported so the detection loop can call it directly in the next phase
-// instead of going back out through HTTP.
-func FetchSnapshot(entityID string) ([]byte, string, error) {
-	reqURL := fmt.Sprintf("%s/api/camera_proxy/%s", config.C.HAURL, entityID)
-
-	req, err := http.NewRequest("GET", reqURL, nil)
-	if err != nil {
-		return nil, "", fmt.Errorf("invalid Home Assistant address")
-	}
-	req.Header.Set("Authorization", "Bearer "+config.C.HAToken)
-
-	resp, err := haClient.Do(req)
-	if err != nil {
-		return nil, "", fmt.Errorf("could not reach Home Assistant: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
-		return nil, "", fmt.Errorf("Home Assistant returned %d: %s",
-			resp.StatusCode, strings.TrimSpace(string(body)))
-	}
-
-	// 10 MB ceiling so a misbehaving camera cannot exhaust memory.
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
-	if err != nil {
-		return nil, "", fmt.Errorf("could not read the image: %w", err)
-	}
-	if len(data) == 0 {
-		return nil, "", fmt.Errorf("Home Assistant returned an empty image - the camera may not support snapshots")
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = "image/jpeg"
-	}
-	return data, contentType, nil
-}
-
-// ---------------------------------------------------------------- snapshot cache
-
-type snapshotEntry struct {
-	data        []byte
-	contentType string
-	fetchedAt   time.Time
-	err         error
-}
-
-var (
-	snapshotMu    sync.Mutex
-	snapshotCache = map[string]*snapshotEntry{}
-	snapshotBusy  = map[string]chan struct{}{}
-)
-
-// Two shared clients, on purpose.
-//
-// Shared: a new http.Client per request opens a fresh TCP connection and throws
-// it away. Reusing one keeps connections to Home Assistant alive, which matters
-// once the dashboard asks several times a second per camera.
-//
-// Two of them, because the two kinds of request need opposite timeouts.
-var (
-	// haClient is for requests that finish: listing entities, fetching one
-	// frame. Timeout covers the whole exchange, so nothing can hang forever.
-	haClient = &http.Client{Timeout: 10 * time.Second}
-
-	// haStreamClient is for MJPEG, which is meant to stay open for hours. A
-	// total Timeout would cut the video off mid-stream, so only the wait for
-	// the FIRST response is bounded - after that the stream runs as long as it
-	// likes.
-	haStreamClient = &http.Client{
-		Transport: &http.Transport{
-			ResponseHeaderTimeout: 10 * time.Second,
-		},
-	}
-)
-
-// cachedSnapshot returns a recent frame, fetching a new one only when the
-// cached frame has aged out.
-//
-// It exists because of two things that bite in practice:
-//
-//  1. Several tiles, several operators and several browser tabs all want the
-//     same camera. Without this, every one of them is a separate round trip
-//     to Home Assistant for an identical picture.
-//
-//  2. Some cameras are slow. A generic RTSP camera makes Home Assistant start
-//     ffmpeg, wait for a keyframe and encode a JPEG, which can take seconds.
-//     Asking again before the last answer arrives piles requests up until
-//     Home Assistant, and then everything else, grinds to a halt.
-//
-// So only one fetch per camera is ever in flight. Everyone who asks while it
-// is running waits for it and shares the result.
-func cachedSnapshot(entityID string) ([]byte, string, error) {
-	for {
-		snapshotMu.Lock()
-
-		if entry, ok := snapshotCache[entityID]; ok && time.Since(entry.fetchedAt) < config.C.SnapshotTTL {
-			snapshotMu.Unlock()
-			return entry.data, entry.contentType, entry.err
-		}
-
-		if busy, running := snapshotBusy[entityID]; running {
-			snapshotMu.Unlock()
-			<-busy // someone else is already fetching - wait, then re-check
-			continue
-		}
-
-		done := make(chan struct{})
-		snapshotBusy[entityID] = done
-		snapshotMu.Unlock()
-
-		data, contentType, err := FetchSnapshot(entityID)
-
-		snapshotMu.Lock()
-		snapshotCache[entityID] = &snapshotEntry{
-			data:        data,
-			contentType: contentType,
-			fetchedAt:   time.Now(),
-			err:         err,
-		}
-		delete(snapshotBusy, entityID)
-		evictStaleSnapshots()
-		snapshotMu.Unlock()
-		close(done)
-
-		return data, contentType, err
-	}
-}
-
-// snapshotRetention is how long an unused frame is kept before being dropped.
-// Without this the cache holds one frame - up to 10 MB - for every camera ever
-// requested, including cameras that were deleted months ago.
-const snapshotRetention = 30 * time.Second
-
-// evictStaleSnapshots drops frames nobody has asked for recently.
-// The caller must already hold snapshotMu.
-func evictStaleSnapshots() {
-	for entityID, entry := range snapshotCache {
-		if time.Since(entry.fetchedAt) > snapshotRetention {
-			delete(snapshotCache, entityID)
-		}
-	}
-}
+// Shared by HTTP preview and the detector. Initialized after config.Load.
+var Snapshots *cameras.Service
+var haClient = &http.Client{Timeout: 10 * time.Second}
+var haStreamClient = &http.Client{Transport: &http.Transport{ResponseHeaderTimeout: 10 * time.Second}}

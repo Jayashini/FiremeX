@@ -44,6 +44,15 @@ const (
 
 // Incident is one hazard report.
 type Incident struct {
+	ReviewStatus      string     `json:"review_status" gorm:"not null;default:unconfirmed"`
+	SampleID          string     `json:"sample_id"`
+	IdempotencyKey    *string    `json:"-" gorm:"uniqueIndex"`
+	ObservedAt        *time.Time `json:"observed_at"`
+	ModelVersion      string     `json:"model_version"`
+	ThresholdUsed     *float64   `json:"threshold_used"`
+	EvidenceStatus    string     `json:"evidence_status" gorm:"not null;default:missing"`
+	EvidenceExpiresAt *time.Time `json:"evidence_expires_at"`
+
 	// These four fields are exactly what gorm.Model would have given us. They
 	// are written out by hand for one reason: CreatedAt needs index tags, and a
 	// field inherited from an embedded struct cannot be tagged.
