@@ -1,5 +1,7 @@
 # Cameras in FiremeX — how they work, and how to set them up
 
+For the current supervisor demonstration, use the tested [demo runbook](docs/supervisor-demo-runbook.md). It includes the authenticated JPEG bridge required for the MacBook webcam.
+
 For anyone joining the project. Part 1 explains how cameras work. Part 2 is the
 setup you actually run. You can skip to Part 2 if you just want it working.
 
@@ -86,8 +88,8 @@ start from the last complete picture and replay every change since.
 FiremeX uses whole pictures because:
 
 - a browser `<img>` tag understands them, and understands nothing else
-- **the fire detection model needs one frame at a time anyway** — that is
-  exactly what it will ask for in the next phase
+- **the fire detection model needs one frame at a time anyway** — the backend
+  worker now samples these same still images for detection
 - it works with every camera type, where video streaming does not
 
 We tried the video route first. Home Assistant cannot reliably convert an RTSP
@@ -100,14 +102,13 @@ shows up as a black tile. Still pictures work everywhere.
 |---|---|---|
 | Home Assistant demo camera | ~10 ms | Already stores JPEGs |
 | **Real CCTV** (Hikvision, Dahua, Reolink, Tapo, ONVIF) | **fast** | Publishes its own snapshot URL |
-| A laptop webcam over RTSP | 1–3 s | Home Assistant must decode video to build each JPEG |
+| A laptop webcam over RTSP | Varies | The demo JPEG bridge decodes the stream once and serves fresh images |
 
 Slightly surprising: **a real CCTV camera performs better than a laptop
 webcam.** Proper cameras hand out a photo on request. A laptop only gives you
 compressed video, which has to be unpacked every time.
 
-So if the dev webcam feels slow — that is expected, and it is not a FiremeX
-problem.
+If the webcam is slow, check the publisher and bridge before changing FireMeX sampling settings.
 
 ## Two things that stop it falling over
 
@@ -142,7 +143,7 @@ cd FiremeX
 docker compose up -d
 ```
 
-Starts Home Assistant on port 8123 and PostgreSQL on 5432.
+Starts Home Assistant on port 8123 and PostgreSQL on host port 5433.
 
 Check both are up:
 
@@ -229,161 +230,25 @@ You should see a picture. **Setup complete.**
 
 ## Optional — using your laptop webcam
 
-Only if you want a real moving picture. Adds two programs you must keep
-running.
-
-### Why it is not simple
-
-Docker on macOS and Windows runs Linux inside a virtual machine, and **that VM
-cannot see your camera**. There is no camera passthrough. So the webcam has to
-be published onto the network and pulled back in by Home Assistant:
+Docker on macOS does not receive the MacBook camera directly. For the supervisor demo the path is:
 
 ```
-webcam → ffmpeg → mediamtx → Home Assistant → FiremeX
+MacBook webcam → FFmpeg publisher → MediaMTX RTSP → authenticated JPEG bridge → Home Assistant Generic Camera → FireMeX
 ```
 
-`ffmpeg` reads the camera. `mediamtx` is a small server that holds the stream
-so several things can watch it.
-
-### W1 — Install
+Install FFmpeg and MediaMTX, copy `mediamtx.yml.example` to the gitignored `mediamtx.yml`, and replace its example password. Use `firemex-model/.venv/bin/python scripts/demo/local-stream.py camera --list` to find the exact camera device name. Start MediaMTX, then the publisher and JPEG bridge in separate terminals from the repository root:
 
 ```bash
-brew install ffmpeg mediamtx          # macOS
+mediamtx mediamtx.yml
+firemex-model/.venv/bin/python scripts/demo/local-stream.py camera 'FaceTime HD Camera'
+firemex-model/.venv/bin/python scripts/demo/local-stream.py bridge webcam
 ```
 
-Linux and Windows: install ffmpeg from your package manager, and download
-mediamtx from https://github.com/bluenviron/mediamtx/releases
+The helper reads the password from the local config without putting it in command history. In Home Assistant's Generic Camera, use RTSP stream URL `rtsp://host.docker.internal:8554/webcam` and Still Image URL `http://host.docker.internal:8765/webcam.jpg`, with username `firemex`, the local password, Basic authentication and TCP RTSP transport. Add that entity from FireMeX **Live Feed → Add Camera**. The image appears in Live Feed after enrollment; the Add Camera form does not fetch an unenrolled camera frame.
 
-### W2 — Create your stream config
+For a separate prerecorded source, use `local-stream.py replay /absolute/path/to/video.mp4` and `local-stream.py bridge replay`. Its Home Assistant URLs end in `/replay` and `:8766/replay.jpg`; label it as recorded in FireMeX. See the [demo runbook](docs/supervisor-demo-runbook.md) for the full startup order, model service, detector and acceptance steps.
 
-`mediamtx.yml` is git-ignored because it holds a password. Copy the example:
-
-```bash
-cp mediamtx.yml.example mediamtx.yml
-```
-
-Generate a password and put it in the `pass:` line:
-
-```bash
-openssl rand -hex 12
-```
-
-The config already limits things sensibly: RTSP only, one path, password
-required. Without a password, **anyone on the same Wi-Fi could watch your
-webcam.**
-
-### W3 — Find your camera number
-
-```bash
-ffmpeg -f avfoundation -list_devices true -i ""          # macOS
-ffmpeg -f dshow -list_devices true -i dummy              # Windows
-ls /dev/video*                                           # Linux
-```
-
-macOS shows something like `[0] FaceTime HD Camera`. Note the number. An error
-at the end of the listing is normal.
-
-**macOS only:** the first run asks for camera permission. If no prompt appears,
-System Settings → Privacy & Security → Camera → enable Terminal, then **fully
-quit and reopen Terminal**.
-
-### W4 — Start the stream server
-
-```bash
-cd FiremeX
-mediamtx
-```
-
-Leave it running. It must be started from the project folder so it finds
-`mediamtx.yml`.
-
-### W5 — Publish your camera
-
-New terminal, leave it running:
-
-```bash
-ffmpeg -f avfoundation -framerate 30 -video_size 1280x720 -i "0:none" \
-  -c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p \
-  -g 30 \
-  -f rtsp rtsp://firemex:YOUR_PASSWORD@localhost:8554/webcam
-```
-
-Windows: replace `-f avfoundation -i "0:none"` with
-`-f dshow -i video="Your Camera Name"`.
-Linux: use `-f v4l2 -i /dev/video0`.
-
-**`-g 30` is not optional.** It forces a complete picture every second. Without
-it the default is every 250 frames — over 8 seconds — and Home Assistant sits
-waiting for one before it can build a photo. This single flag took snapshots
-from 3–10 seconds down to about 2.
-
-### W6 — Check it before touching Home Assistant
-
-```bash
-ffplay rtsp://firemex:YOUR_PASSWORD@localhost:8554/webcam
-```
-
-If you see yourself, continue. If not, fix it here — debugging gets much harder
-once Home Assistant is in the chain.
-
-### W7 — Add it to Home Assistant
-
-1. **Settings → Devices & Services → + Add Integration**
-2. Search **Generic Camera**
-3. **Stream Source URL:** `rtsp://host.docker.internal:8554/webcam`
-4. **Username:** `firemex`  **Password:** your password
-5. Leave **Still Image URL** empty
-6. Submit — a picture of you should appear — then confirm and name it
-
-`host.docker.internal` is how a container reaches your computer. On Linux, use
-your machine's IP instead (`hostname -I`).
-
-### W8 — Add it in FiremeX
-
-**Live Feed → Add Camera** — it is now in the dropdown.
-
----
-
-## Starting up each day
-
-Order matters:
-
-```
-1. docker compose up -d        Home Assistant + database
-2. mediamtx                    only if using the webcam
-3. ffmpeg ...                  only if using the webcam
-4. cd backend && go run main.go
-5. cd frontend && npm run dev
-```
-
-If you start ffmpeg before mediamtx it fails with "connection refused" —
-nothing is listening yet.
-
-Save the ffmpeg command as a script so you stop retyping it.
-
----
-
-## When something breaks
-
-| What you see | Cause |
-|---|---|
-| Camera tile is black | Check the backend terminal — it logs why |
-| `401` on `/api/cameras/snapshot/...` | Log out and log in again (the cookie is set at login) |
-| `Home Assistant returned 401` | `HA_TOKEN` in `.env` is wrong or expired |
-| `could not reach Home Assistant` | Containers not running — `docker compose ps` |
-| Camera missing from the dropdown | Not added in Home Assistant yet, or the token is wrong |
-| Webcam tile very slow | Normal for a laptop. `-g 30` helps. Real CCTV is faster |
-| ffmpeg: "Input/output error" | Camera permission not granted to your terminal |
-| Stream stops after a while | ffmpeg exited — check that terminal |
-
-**The backend log is the best tool.** It says exactly what Home Assistant
-replied:
-
-```
-snapshot camera.front_door: Home Assistant returned 500: ...
-```
-
----
+The bridge requires Basic authentication and returns HTTP 503 if no fresh image arrives for five seconds. If Home Assistant returns 500, check its Still Image URL and whether the container can reach the bridge. If FFmpeg exits, the publisher retries after two seconds. A macOS camera-permission prompt may require enabling the terminal app in System Settings → Privacy & Security → Camera.
 
 ## Please do not change these without reading why
 
@@ -437,17 +302,16 @@ MJPEG-native cameras and is kept deliberately.
 |---|---|
 | `docker-compose.yml` | Home Assistant + PostgreSQL |
 | `backend/.env.example` | Copy to `.env`, add your token |
-| `mediamtx.yml.example` | Copy to `mediamtx.yml`, add a password. Webcam only |
+| `mediamtx.yml.example` | Copy to `mediamtx.yml`, add a password. Webcam and replay paths |
 
 ---
 
-## What is not built yet
+## Current detection status
 
-The camera feed works. **Fire detection is not connected to it.**
-
-The model exists in `firemex-model/` and runs on its own, but nothing calls it.
-`ai_enabled` on a camera is stored and shown, and nothing reads it. The
-Dashboard, Incidents and Alerts pages show sample data and say so.
-
-The next phase connects them: a loop that takes a picture every few seconds
-from each camera with AI enabled, sends it to the model, and raises an alert.
+The backend now samples AI-enabled Home Assistant cameras, calls the model,
+stores incidents with annotated evidence, and shows them in the Incidents page.
+The Dashboard and Alerts pages still contain explicitly labeled preview data.
+This integration has not established that the model reliably detects all fires;
+the supervisor test log records a missed public-domain fire photo. See
+[supervisor-demo-progress.md](docs/supervisor-demo-progress.md) for the current
+verification results.

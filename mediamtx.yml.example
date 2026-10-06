@@ -17,15 +17,16 @@
 # So this config:
 #   1. turns off every protocol except RTSP
 #   2. requires a username and password to publish or read
-#   3. allows only the single path "webcam", not any path
+#   3. allows named webcam and replay paths
 
 # 1. Only RTSP is needed. Everything else is off.
 rtmp: no
 hls: no
 webrtc: no
 srt: no
+moq: no
 
-# 2. One account, allowed to publish and read only the webcam path.
+# 2. One account, allowed to publish and read the named demo paths.
 authInternalUsers:
   - user: firemex
     pass: generate-your-own-see-README
@@ -35,7 +36,12 @@ authInternalUsers:
         path: webcam
       - action: read
         path: webcam
+      - action: publish
+        path: replay
+      - action: read
+        path: replay
 
-# 3. Only this path exists. Publishing to any other name is refused.
+# 3. Add permissions AND a named path for each additional test source.
 paths:
   webcam:
+  replay:

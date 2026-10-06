@@ -89,3 +89,7 @@ firemex-model/annotate_sample.jpg
 # --- Incident evidence photos (written at runtime, not source) ---
 backend/incidents/
 backend/data/
+
+# Supervisor demo generated evidence and local results
+backend/evidence/
+.demo-runtime/

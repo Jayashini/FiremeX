@@ -11,6 +11,8 @@ torchvision==0.20.1+cpu ; platform_machine == "x86_64"
 torch==2.5.1            ; platform_machine != "x86_64"
 torchvision==0.20.1     ; platform_machine != "x86_64"
 
+numpy==1.26.4
+
 ultralytics==8.2.0
 opencv-python-headless==4.9.0.80
 pillow==10.4.0

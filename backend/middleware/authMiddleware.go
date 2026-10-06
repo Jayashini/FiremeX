@@ -2,6 +2,9 @@ package middleware
 
 import (
 	"fmt"
+	"github.com/firemex/backend/database"
+	"github.com/firemex/backend/models"
+	"math"
 	"net/http"
 	"strings"
 
@@ -49,7 +52,7 @@ func RequireAuth(c *gin.Context) {
 	// 3. Parse and Verify the Holographic Signature of the token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Ensure the signing method is what we expect (HS256)
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("Unexpected signing method")
 		}
 		return config.C.JWTSecret, nil
@@ -68,6 +71,23 @@ func RequireAuth(c *gin.Context) {
 		c.Set("userID", claims["sub"])
 	}
 
-	// 6. Open the gate! Let the request continue to the controller.
+	// Resolve account state centrally on every protected request, including images.
+	value, exists := c.Get("userID")
+	id, valid := value.(float64)
+	if !exists || !valid || math.IsNaN(id) || math.IsInf(id, 0) || id <= 0 || math.Trunc(id) != id || id > 9007199254740991 {
+		c.AbortWithStatusJSON(401, gin.H{"error": "Invalid user ID"})
+		return
+	}
+	var user models.User
+	if err := database.DB.WithContext(c.Request.Context()).First(&user, uint(id)).Error; err != nil {
+		c.AbortWithStatusJSON(401, gin.H{"error": "User not found"})
+		return
+	}
+	if user.Status != "active" || user.OrganizationID == nil || *user.OrganizationID == 0 {
+		c.AbortWithStatusJSON(403, gin.H{"error": "An active organization account is required"})
+		return
+	}
+	c.Set("currentUser", user)
+
 	c.Next()
 }

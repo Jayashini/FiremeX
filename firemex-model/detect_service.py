@@ -1,99 +1,146 @@
-"""FiremeX fire/smoke detection service.
-
-A small HTTP wrapper around the YOLOv8 model. It exists because the model is a
-PyTorch checkpoint and your backend is Go — rather than trying to run PyTorch
-from Go, run this alongside it and call it over HTTP.
-
-    pip install -r requirements.txt
-    python detect_service.py                  # listens on :8100
-
-Then from Go (or anything else):
-
-    POST http://localhost:8100/detect
-      multipart form field "image" = a JPEG/PNG
-    ->
-    {
-      "hazard": true,
-      "detections": [
-        {"label": "fire", "confidence": 0.64,
-         "box": {"x1": 310, "y1": 300, "x2": 340, "y2": 355}}
-      ]
-    }
-
-The model is loaded ONCE at startup, not per request — loading it takes a few
-seconds and doing that per frame would make the service unusable.
-"""
+"""Bounded local CPU inference. Run exactly one Uvicorn worker."""
+import asyncio
+import base64
+import hashlib
 import io
 import logging
+import math
 import os
+import threading
+from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from PIL import Image
+from starlette.concurrency import run_in_threadpool
 from ultralytics import YOLO
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-logger = logging.getLogger("firemex.detect")
+from annotate import draw_boxes
 
 MODEL_PATH = os.environ.get("MODEL_PATH", os.path.join(os.path.dirname(__file__), "fire_model.pt"))
-
-# Minimum confidence for a detection to be reported. 0.50 is the value the
-# original project ships with; see README for why you may want it higher.
 CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.50"))
-
 PORT = int(os.environ.get("PORT", "8100"))
+MAX_BYTES = 10 * 1024 * 1024
+MAX_PIXELS = 20_000_000
+Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+model = None
+model_version = None
+inference_lock = threading.Lock()
+logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="FiremeX detection service")
-model: YOLO | None = None
 
-
-@app.on_event("startup")
-def load_model():
-    global model
-    if not os.path.exists(MODEL_PATH):
-        raise SystemExit(f"Model not found at {MODEL_PATH}. Set MODEL_PATH or put "
-                         f"fire_model.pt next to this file.")
-    logger.info(f"loading model: {MODEL_PATH}")
+@asynccontextmanager
+async def lifespan(app):
+    global model, model_version
+    if not math.isfinite(CONFIDENCE_THRESHOLD) or not 0 <= CONFIDENCE_THRESHOLD <= 1:
+        raise ValueError("CONFIDENCE_THRESHOLD must be in [0,1]")
+    with open(MODEL_PATH, "rb") as weights:
+        model_version = "sha256:" + hashlib.file_digest(weights, "sha256").hexdigest()
     model = YOLO(MODEL_PATH)
-    logger.info(f"ready — classes: {model.names}  threshold: {CONFIDENCE_THRESHOLD}")
+    if set(model.names.values()) != {"fire", "smoke"}:
+        raise ValueError("Model must have exactly fire and smoke classes")
+    # The first CPU prediction can spend tens of seconds initializing kernels.
+    # Do that before health reports ready, so the first monitored frame has the
+    # same bounded latency as later frames.
+    model(Image.new("RGB", (640, 480), (32, 32, 32)),
+          conf=CONFIDENCE_THRESHOLD, device="cpu", verbose=False)
+    yield
+
+
+app = FastAPI(title="FiremeX detection service", lifespan=lifespan)
+
+
+class UploadLimit:
+    """Bound the whole multipart request before Starlette parses/spools it."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope.get("path") != "/detect":
+            return await self.app(scope, receive, send)
+        body = bytearray()
+        try:
+            while True:
+                message = await asyncio.wait_for(receive(), timeout=15)
+                if message["type"] == "http.disconnect":
+                    return
+                body.extend(message.get("body", b""))
+                if len(body) > MAX_BYTES + 64 * 1024:
+                    await send({"type": "http.response.start", "status": 413, "headers": []})
+                    await send({"type": "http.response.body", "body": b"Upload too large"})
+                    return
+                if not message.get("more_body", False):
+                    break
+        except asyncio.TimeoutError:
+            await send({"type": "http.response.start", "status": 408, "headers": []})
+            await send({"type": "http.response.body", "body": b"Upload timed out"})
+            return
+        delivered = False
+        async def bounded_receive():
+            nonlocal delivered
+            if delivered:
+                return await receive()
+            delivered = True
+            return {"type": "http.request", "body": bytes(body), "more_body": False}
+        await self.app(scope, bounded_receive, send)
+
+
+app.add_middleware(UploadLimit)
 
 
 @app.get("/health")
-def health():
-    """Cheap liveness check — use this from docker-compose or your Go startup."""
-    return {"ok": model is not None,
-            "classes": model.names if model else None,
-            "threshold": CONFIDENCE_THRESHOLD}
+async def health():
+    return {"ok": model is not None, "classes": model.names if model else None,
+            "threshold": CONFIDENCE_THRESHOLD, "model_version": model_version,
+            "device": "cpu", "busy": inference_lock.locked()}
+
+
+def infer(raw, annotate, cutoff):
+    if not inference_lock.acquire(blocking=False):
+        raise HTTPException(503, "inference busy; retry later")
+    try:
+        try:
+            with Image.open(io.BytesIO(raw)) as source:
+                if source.format not in {"JPEG", "PNG"} or source.width * source.height > MAX_PIXELS:
+                    raise ValueError("image bounds")
+                source.load()
+                frame = source.convert("RGB")
+        except Exception:
+            raise HTTPException(400, "could not decode bounded JPEG/PNG")
+        results = model(frame, conf=cutoff, device="cpu", verbose=False)[0]
+        detections = []
+        for box in results.boxes:
+            confidence = float(box.conf[0])
+            label = results.names[int(box.cls[0])]
+            x1, y1, x2, y2 = (float(v) for v in box.xyxy[0])
+            if (label not in {"fire", "smoke"} or not math.isfinite(confidence)
+                    or not 0 <= confidence <= 1 or not all(map(math.isfinite, (x1, y1, x2, y2)))
+                    or not 0 <= x1 < x2 <= frame.width or not 0 <= y1 < y2 <= frame.height):
+                raise HTTPException(500, "invalid model output")
+            if confidence < cutoff:
+                continue
+            detections.append({"label": label, "confidence": confidence,
+                               "box": {"x1": x1, "y1": y1, "x2": x2, "y2": y2}})
+        response = {"hazard": bool(detections), "detections": detections, "model_version": model_version}
+        if annotate and detections:
+            response["annotated_image"] = base64.b64encode(draw_boxes(frame, detections)).decode("ascii")
+        return response
+    finally:
+        inference_lock.release()
 
 
 @app.post("/detect")
-async def detect(image: UploadFile = File(...)):
-    """Run the model on one frame and return every detection above threshold."""
+async def detect(image: UploadFile = File(...), annotate: bool = Form(False), threshold: float | None = Form(None)):
     if model is None:
-        raise HTTPException(status_code=503, detail="model not loaded")
-
-    raw = await image.read()
-    try:
-        frame = Image.open(io.BytesIO(raw)).convert("RGB")
-    except Exception:
-        raise HTTPException(status_code=400, detail="could not decode image")
-
-    results = model(frame, verbose=False)[0]
-
-    detections = []
-    for box in results.boxes:
-        confidence = float(box.conf[0])
-        if confidence < CONFIDENCE_THRESHOLD:
-            continue
-        x1, y1, x2, y2 = (int(v) for v in box.xyxy[0])
-        detections.append({
-            "label": results.names[int(box.cls[0])],
-            "confidence": round(confidence, 4),
-            "box": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
-        })
-
-    return {"hazard": bool(detections), "detections": detections}
+        raise HTTPException(503, "model not loaded")
+    cutoff = CONFIDENCE_THRESHOLD if threshold is None else threshold
+    if not math.isfinite(cutoff) or not 0 <= cutoff <= 1:
+        raise HTTPException(422, "threshold must be finite and in [0,1]")
+    raw = await image.read(MAX_BYTES + 1)
+    await image.close()
+    if not raw or len(raw) > MAX_BYTES:
+        raise HTTPException(413, "empty or oversized image")
+    return await run_in_threadpool(infer, raw, annotate, cutoff)
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host="127.0.0.1", port=PORT, limit_concurrency=8)

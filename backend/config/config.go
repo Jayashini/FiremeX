@@ -10,8 +10,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -30,6 +33,12 @@ const devPassword = "secretpassword"
 
 // Config holds every setting FiremeX needs to run.
 type Config struct {
+	DetectionEnabled                                                     bool
+	ModelURL                                                             string
+	DetectionInterval, ModelTimeout, IncidentCooldown, EvidenceRetention time.Duration
+	FireThreshold, SmokeThreshold                                        float64
+	EvidenceMaxBytes                                                     int64
+
 	Port        string   // port the API listens on
 	DatabaseDSN string   // full database connection string
 	JWTSecret   []byte   // key used to sign and verify login tokens
@@ -68,6 +77,19 @@ func Load() {
 		DataDir:     dataDir,
 		SnapshotTTL: duration("SNAPSHOT_TTL_MS", 200*time.Millisecond),
 	}
+	C.DetectionEnabled = boolean("DETECTION_ENABLED", true)
+	C.ModelURL = env("MODEL_URL", "http://127.0.0.1:8100")
+	u, err := url.Parse(C.ModelURL)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		log.Fatal("invalid MODEL_URL")
+	}
+	C.DetectionInterval = time.Duration(integer("DETECTION_INTERVAL_MS", 2000, 100, 60000)) * time.Millisecond
+	C.ModelTimeout = time.Duration(integer("MODEL_TIMEOUT_MS", 15000, 100, 120000)) * time.Millisecond
+	C.IncidentCooldown = time.Duration(integer("INCIDENT_COOLDOWN_SECONDS", 60, 1, 86400)) * time.Second
+	C.EvidenceRetention = time.Duration(integer("EVIDENCE_RETENTION_DAYS", 7, 1, 365)) * 24 * time.Hour
+	C.EvidenceMaxBytes = integer("EVIDENCE_MAX_BYTES", 1<<30, 1, 1<<40)
+	C.FireThreshold = score("FIRE_CONFIDENCE_THRESHOLD", 0.5)
+	C.SmokeThreshold = score("SMOKE_CONFIDENCE_THRESHOLD", 0.5)
 	C.JWTSecret = []byte(resolveSecret(dataDir))
 
 	if C.HAToken == "" {
@@ -90,7 +112,7 @@ func databaseDSN() string {
 		env("DB_USER", "admin"),
 		env("DB_PASSWORD", devPassword),
 		env("DB_NAME", "firemex"),
-		env("DB_PORT", "5432"),
+		env("DB_PORT", "5433"),
 		env("DB_SSLMODE", "disable"),
 	)
 }
@@ -160,4 +182,27 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+func integer(key string, fallback, min, max int64) int64 {
+	raw := env(key, strconv.FormatInt(fallback, 10))
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || v < min || v > max {
+		log.Fatalf("invalid %s (expected %d..%d)", key, min, max)
+	}
+	return v
+}
+func score(key string, fallback float64) float64 {
+	v, err := strconv.ParseFloat(env(key, strconv.FormatFloat(fallback, 'f', -1, 64)), 64)
+	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) || v < 0 || v > 1 {
+		log.Fatalf("invalid %s (expected 0..1)", key)
+	}
+	return v
+}
+func boolean(key string, fallback bool) bool {
+	v, err := strconv.ParseBool(env(key, strconv.FormatBool(fallback)))
+	if err != nil {
+		log.Fatalf("invalid %s", key)
+	}
+	return v
 }
