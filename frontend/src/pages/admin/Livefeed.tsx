@@ -1,14 +1,64 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { API } from '../../api'
 import { authHeaders } from '../../session'
 import { CameraFrame } from '../../components/common/CameraFrame'
 import type { DetectorStatus } from '../../types/incident'
+import { browserWebcamFor, forgetBrowserWebcam } from '../../browserWebcams'
 
 type Camera = { ID: number; display_name: string; zone: string; entity_id: string; ai_enabled: boolean }
 type Props = { onNavigate: (path: string) => void; readOnly?: boolean }
+
+function isBrowserWebcam(camera: Camera) {
+ return browserWebcamFor(String(camera.ID)) !== null || /webcam/i.test(camera.display_name)
+}
+
+function BrowserWebcamFrame({ camera, className }: { camera: Camera; className: string }) {
+ const video = useRef<HTMLVideoElement>(null)
+ const stream = useRef<MediaStream | null>(null)
+ const [failed, setFailed] = useState(false)
+ const [requesting, setRequesting] = useState(true)
+ const deviceId = browserWebcamFor(String(camera.ID)) ?? ''
+
+ useEffect(() => {
+  let stopped = false
+  async function start() {
+   setRequesting(true)
+   setFailed(false)
+   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    setRequesting(false); setFailed(true); return
+   }
+   try {
+    const active = await navigator.mediaDevices.getUserMedia({
+     audio: false,
+     video: deviceId ? { deviceId: { exact: deviceId } } : true
+    })
+    if (stopped) { active.getTracks().forEach(track => track.stop()); return }
+    stream.current = active
+    const track = active.getVideoTracks()[0]
+    if (track) track.onended = () => { if (!stopped) setFailed(true) }
+    if (video.current) { video.current.srcObject = active; await video.current.play() }
+    if (!stopped) setRequesting(false)
+   } catch {
+    if (!stopped) { setRequesting(false); setFailed(true) }
+   }
+  }
+  void start()
+  return () => {
+   stopped = true
+   stream.current?.getTracks().forEach(track => track.stop())
+   stream.current = null
+   if (video.current) video.current.srcObject = null
+  }
+ }, [deviceId])
+
+ if (failed) return <><CameraFrame entityId={camera.entity_id} alt={camera.display_name} className={className} /><span class="absolute bottom-3 left-3 bg-black/80 px-3 py-1 rounded-lg text-xs text-amber-300">Browser webcam unavailable · showing Home Assistant feed</span></>
+ return <><video ref={video} autoPlay playsInline muted class={className} />{requesting && <span role="status" class="absolute inset-0 flex items-center justify-center text-sm text-slate-400 bg-black">Starting live webcam…</span>}</>
+}
+
 export function Livefeed({ onNavigate, readOnly = false }: Props) {
  const [cameras, setCameras] = useState<Camera[]>([])
  const [statuses, setStatuses] = useState<DetectorStatus[]>([])
+ const [detectorAvailable, setDetectorAvailable] = useState(true)
  const [error, setError] = useState('')
  const [warning, setWarning] = useState('')
  const [loaded, setLoaded] = useState(false)
@@ -23,11 +73,43 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
    const timeout = window.setTimeout(() => abort?.abort(), 15000)
    try {
     const options = { headers: authHeaders(), credentials: 'include' as const, signal: abort.signal }
-    const [cr, sr] = await Promise.all([fetch(`${API}cameras`, options), fetch(`${API}detection/status`, options)])
-    if (!cr.ok || !sr.ok) throw new Error('Camera or detector status unavailable')
-    const [cd, sd] = await Promise.all([cr.json(), sr.json()])
-    if (!stopped) { setCameras(cd.cameras ?? []); setStatuses(sd.cameras ?? []); setWarning(sd.storage_warning || sd.discovery_warning || ''); setError('') }
-   } catch (err) { if (!stopped) setError(err instanceof Error ? err.message : 'Status unavailable') }
+    const [cameraResult, statusResult] = await Promise.allSettled([
+     fetch(`${API}cameras`, options),
+     fetch(`${API}detection/status`, options)
+    ])
+
+    if (stopped) return
+
+    if (cameraResult.status === 'fulfilled' && cameraResult.value.ok) {
+     try {
+      const data = await cameraResult.value.json()
+      if (!stopped) { setCameras(data.cameras ?? []); setError('') }
+     } catch {
+      setError('Camera list returned an invalid response')
+     }
+    } else {
+     setError('Camera list unavailable')
+    }
+
+    if (statusResult.status === 'fulfilled' && statusResult.value.ok) {
+     try {
+      const data = await statusResult.value.json()
+      if (!stopped) {
+       setStatuses(data.cameras ?? [])
+       setDetectorAvailable(true)
+       setWarning(data.storage_warning || data.discovery_warning || '')
+      }
+     } catch {
+      setStatuses([])
+      setDetectorAvailable(false)
+      setWarning('AI detector status returned an invalid response. Camera feeds can still be viewed.')
+     }
+    } else {
+     setStatuses([])
+     setDetectorAvailable(false)
+     setWarning('AI detector status is temporarily unavailable. Camera feeds can still be viewed.')
+    }
+   } catch (err) { if (!stopped) setError(err instanceof Error ? err.message : 'Camera list unavailable') }
    finally { window.clearTimeout(timeout); running = false; if (!stopped) { setLoaded(true); if (!document.hidden) timer = window.setTimeout(load, 2000) } }
   }
   function visibility() { window.clearTimeout(timer); if (!document.hidden) void load() }
@@ -40,6 +122,7 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
   try {
    const response = await fetch(`${API}cameras/${camera.ID}${remove ? '' : '/detection'}`, { method: remove ? 'DELETE' : 'PATCH', headers: authHeaders(), credentials: 'include', body: remove ? undefined : JSON.stringify({ ai_enabled: !camera.ai_enabled }) })
    if (!response.ok) throw new Error(`Camera update failed (HTTP ${response.status})`)
+   if (remove) forgetBrowserWebcam(String(camera.ID))
    setRefresh(n => n + 1)
   } catch (err) { setError(err instanceof Error ? err.message : 'Camera update failed') }
   finally { setBusy(null) }
@@ -50,9 +133,9 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
   {warning && <p role="alert" class="text-amber-300">{warning}</p>}
   <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">{cameras.map(camera => {
    const status = statuses.find(s => s.camera_id === camera.ID)
-   const state = error ? 'status unavailable' : status?.state ?? 'starting'
+   const state = detectorAvailable ? status?.state ?? 'starting' : 'status unavailable'
    return <article key={camera.ID} class="border border-brand-border bg-brand-surface rounded-2xl overflow-hidden">
-    <div class="relative aspect-video bg-black"><CameraFrame entityId={camera.entity_id} alt={camera.display_name} className="w-full h-full object-contain" /><span class="absolute top-3 left-3 bg-black/80 px-3 py-1 rounded-lg">{camera.display_name}</span></div>
+    <div class="relative aspect-video bg-black">{isBrowserWebcam(camera) ? <BrowserWebcamFrame camera={camera} className="w-full h-full object-contain" /> : <CameraFrame entityId={camera.entity_id} alt={camera.display_name} className="w-full h-full object-contain" />}<span class="absolute top-3 left-3 bg-black/80 px-3 py-1 rounded-lg">{camera.display_name}</span></div>
     <div class="p-5 space-y-3"><div class="flex justify-between gap-3"><h2 class="font-semibold">{camera.display_name} · {camera.zone || 'No zone'}</h2><span class={state === 'monitoring' ? 'text-accent' : 'text-amber-300'}>{state}</span></div>
      <p class="text-xs text-slate-400">{camera.entity_id} · AI {camera.ai_enabled ? 'enabled' : 'disabled'}</p>
      {status?.failure && <p class="text-amber-300 text-sm">{status.failure}</p>}
