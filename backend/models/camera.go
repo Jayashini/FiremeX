@@ -14,19 +14,22 @@ import (
 type Camera struct {
 	gorm.Model
 
-	// EntityID is the Home Assistant entity, e.g. "camera.laptop_webcam".
-	// This is the only link between the two systems.
+	// EntityID is the Home Assistant entity for server cameras, or an opaque
+	// browser.* identifier for a browser-local webcam.
 	EntityID string `json:"entity_id" gorm:"not null"`
+
+	// SourceType distinguishes continuously available Home Assistant cameras
+	// from webcams that exist only inside the browser viewing FireMeX.
+	SourceType string `json:"source_type" gorm:"not null;default:home_assistant"`
 
 	// DisplayName and Zone are the customer's own words - "Loading Bay",
 	// "Warehouse A" - shown to operators instead of the raw entity id.
 	DisplayName string `json:"display_name" gorm:"not null"`
 	Zone        string `json:"zone"`
 
-	// AiEnabled marks a camera for fire and smoke detection. Nothing reads it
-	// yet; the detection loop will use it to decide which cameras to sample,
-	// so a customer can monitor a camera without paying the cost of analysing
-	// it (a car park may not need fire detection, a stockroom does).
+	// AiEnabled marks a Home Assistant camera for fire and smoke detection.
+	// Browser-local webcams cannot be sampled after the browser closes, so the
+	// API always stores them with detection disabled.
 	AiEnabled bool `json:"ai_enabled" gorm:"default:false"`
 
 	// Which organisation owns this camera. Every camera query filters on it -

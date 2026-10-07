@@ -123,6 +123,7 @@ func AddCamera(c *gin.Context) {
 		DisplayName string `json:"display_name" binding:"required"`
 		Zone        string `json:"zone"`
 		AiEnabled   bool   `json:"ai_enabled"`
+		SourceType  string `json:"source_type"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -134,9 +135,20 @@ func AddCamera(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if input.SourceType == "" {
+		input.SourceType = "home_assistant"
+	}
+	if input.SourceType != "home_assistant" && input.SourceType != "browser" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "source_type must be home_assistant or browser"})
+		return
+	}
+	if input.SourceType == "browser" {
+		input.AiEnabled = false
+	}
 
 	camera := models.Camera{
 		EntityID:       input.EntityID,
+		SourceType:     input.SourceType,
 		DisplayName:    input.DisplayName,
 		Zone:           input.Zone,
 		AiEnabled:      input.AiEnabled,

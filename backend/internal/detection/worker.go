@@ -51,7 +51,9 @@ func (w *Worker) Status(cam models.Camera) Status {
 	defer w.mu.Unlock()
 	s := w.statuses[cam.ID]
 	s.CameraID = cam.ID
-	if !w.Config.DetectionEnabled || !cam.AiEnabled {
+	if cam.SourceType == "browser" {
+		s.State = "browser local"
+	} else if !w.Config.DetectionEnabled || !cam.AiEnabled {
 		s.State = "monitoring disabled"
 	} else if w.discoveryWarning != "" {
 		s.State = "storage error"
@@ -92,7 +94,7 @@ func (w *Worker) reconcile(ctx context.Context) {
 	query, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	var cams []models.Camera
-	err := w.DB.WithContext(query).Where("ai_enabled = ?", true).Find(&cams).Error
+	err := w.DB.WithContext(query).Where("ai_enabled = ? AND source_type <> ?", true, "browser").Find(&cams).Error
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err != nil {

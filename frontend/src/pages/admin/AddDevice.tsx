@@ -17,10 +17,7 @@ type BrowserCamera = {
 	label: string
 }
 
-function isWebcam(camera?: AvailableCamera) {
-	if (!camera) return false
-	return /webcam/i.test(`${camera.entity_id} ${camera.friendly_name}`)
-}
+type SourceType = 'home_assistant' | 'browser'
 
 function webcamErrorMessage(error: unknown) {
 	if (!(error instanceof DOMException)) return 'The webcam could not be started.'
@@ -176,13 +173,14 @@ function WebcamPreview({ onDeviceResolved }: { onDeviceResolved: (deviceId: stri
 				)}
 			</div>
 			<p class="text-[11px] text-slate-500 font-mono text-center">
-				This preview uses the webcam attached to this browser device. FireMeX will still save the selected Home Assistant entity for monitoring.
+				This local webcam remains available while FireMeX is open in this browser.
 			</p>
 		</div>
 	)
 }
 
 export function AddDevice({ onNavigate }: Props) {
+	const [sourceType, setSourceType] = useState<SourceType>('home_assistant')
 	const [newCamName, setNewCamName] = useState('')
 	const [selectedEntityId, setSelectedEntityId] = useState('')
 	const [availableCameras, setAvailableCameras] = useState<AvailableCamera[]>([])
@@ -193,8 +191,7 @@ export function AddDevice({ onNavigate }: Props) {
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [errorMsg, setErrorMsg] = useState('')
 	const [browserDeviceId, setBrowserDeviceId] = useState('')
-	const selectedCamera = availableCameras.find((camera) => camera.entity_id === selectedEntityId)
-	const showBrowserWebcamPreview = isWebcam(selectedCamera)
+	const showBrowserWebcamPreview = sourceType === 'browser'
 
 	// Fetch available Home Assistant cameras on mount
 	useEffect(() => {
@@ -235,21 +232,43 @@ export function AddDevice({ onNavigate }: Props) {
 	// When user selects a different HA camera from dropdown, update display name default
 	const handleSelectEntity = (entityId: string) => {
 		setSelectedEntityId(entityId)
-		setBrowserDeviceId('')
 		const found = availableCameras.find((c) => c.entity_id === entityId)
 		if (found && !newCamName) {
 			setNewCamName(found.friendly_name)
 		}
 	}
 
+	const handleSourceType = (nextSource: SourceType) => {
+		setSourceType(nextSource)
+		setErrorMsg('')
+		setBrowserDeviceId('')
+		setNewCamAi(false)
+		if (nextSource === 'browser') {
+			setNewCamName('Computer Webcam')
+		} else {
+			const selected = availableCameras.find((camera) => camera.entity_id === selectedEntityId)
+			setNewCamName(selected?.friendly_name ?? '')
+		}
+	}
+
 	const handleSubmitCamera = async (e: any) => {
 		e.preventDefault()
-		if (!selectedEntityId && availableCameras.length > 0) return
+		if (sourceType === 'home_assistant' && !selectedEntityId) {
+			setErrorMsg('Select or enter a Home Assistant camera entity.')
+			return
+		}
+		if (sourceType === 'browser' && !browserDeviceId) {
+			setErrorMsg('Allow camera access and wait for the webcam preview before adding it.')
+			return
+		}
 
 		setIsSubmitting(true)
 		setErrorMsg('')
 
 		try {
+			const entityId = sourceType === 'browser'
+				? `browser.${typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Date.now()}`
+				: selectedEntityId
 			const token = localStorage.getItem('firemex_token')
 			const res = await fetch(`${API}cameras`, {
 				method: 'POST',
@@ -258,10 +277,11 @@ export function AddDevice({ onNavigate }: Props) {
 					Authorization: `Bearer ${token}`
 				},
 				body: JSON.stringify({
-					entity_id: selectedEntityId || 'camera.demo_camera',
+					entity_id: entityId,
+					source_type: sourceType,
 					display_name: newCamName || 'New Camera Stream',
 					zone: newCamZone,
-					ai_enabled: newCamAi
+					ai_enabled: sourceType === 'home_assistant' && newCamAi
 				})
 			})
 
@@ -269,7 +289,7 @@ export function AddDevice({ onNavigate }: Props) {
 			if (!res.ok) {
 				throw new Error(data.error || 'Failed to add camera')
 			}
-			if (showBrowserWebcamPreview && browserDeviceId && data.camera?.ID) {
+			if (sourceType === 'browser' && browserDeviceId && data.camera?.ID) {
 				rememberBrowserWebcam(String(data.camera.ID), browserDeviceId)
 			}
 
@@ -297,7 +317,7 @@ export function AddDevice({ onNavigate }: Props) {
 					<div class="flex items-start justify-between mb-8">
 						<div>
 							<h1 class="text-[20px] font-semi-bold text-slate-300">Add New Device</h1>
-							<p class="text-sm text-[#8B949E] mt-1 mb-5">Select a Home Assistant camera entity to add to FiremeX.</p>
+							<p class="text-sm text-[#8B949E] mt-1 mb-5">Choose a webcam on this computer or a camera already connected to Home Assistant.</p>
 						</div>
 						<div class="p-3 bg-accent/10 border border-accent/20 rounded-xl text-accent">
 							<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -314,9 +334,23 @@ export function AddDevice({ onNavigate }: Props) {
 					)}
 
 					{/* Grid Fields */}
-					<div class="grid w-full grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-						{/* Home Assistant Camera Entity Dropdown */}
+					<div class="grid w-full grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+						{/* Camera Source */}
 						<div class="flex flex-col gap-2">
+							<label class="text-xs font-mono text-slate-400" for="camera-source">Camera Source</label>
+							<select
+								id="camera-source"
+								value={sourceType}
+								onChange={(event) => handleSourceType(event.currentTarget.value as SourceType)}
+								class="w-full bg-[#050B0D] border border-[#8B949E]/20 focus:border-accent text-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors cursor-pointer"
+							>
+								<option value="home_assistant">Home Assistant / CCTV</option>
+								<option value="browser">Webcam on this computer</option>
+							</select>
+						</div>
+
+						{/* Home Assistant Camera Entity Dropdown */}
+						{sourceType === 'home_assistant' && <div class="flex flex-col gap-2">
 							<label class="text-xs font-mono text-slate-400">Home Assistant Camera</label>
 							{isLoadingHA ? (
 								<div class="w-full bg-[#050B0D] border border-[#8B949E]/20 text-slate-400 rounded-xl px-4 py-3 text-sm animate-pulse">
@@ -349,7 +383,7 @@ export function AddDevice({ onNavigate }: Props) {
 									⚠️ HA API Warning: {haError} (Falling back to manual entity entry)
 								</span>
 							)}
-						</div>
+						</div>}
 
 						{/* Camera Display Name */}
 						<div class="flex flex-col gap-2">
@@ -381,8 +415,8 @@ export function AddDevice({ onNavigate }: Props) {
 							</select>
 						</div>
 
-						{/* Enable AI Tracking (toggle switch) */}
-						<div class="flex items-center gap-4 mt-6">
+						{/* Browser webcams are display-only until browser-to-server ingest is added. */}
+						{sourceType === 'home_assistant' ? <div class="flex items-center gap-4 mt-6">
 							<button
 								type="button"
 								onClick={() => setNewCamAi(!newCamAi)}
@@ -391,7 +425,9 @@ export function AddDevice({ onNavigate }: Props) {
 								<span class={`absolute left-1 top-1 bg-brand-surface w-4 h-4 rounded-full transition-transform duration-200 ${newCamAi ? 'translate-x-6' : 'translate-x-0'}`} />
 							</button>
 							<span class="text-xs font-mono text-slate-400 select-none">Enable FiremeX AI Tracking</span>
-						</div>
+						</div> : <div class="flex items-center mt-6 text-xs font-mono text-slate-500">
+							Browser webcam · local live view
+						</div>}
 					</div>
 
 					{/* Browser webcams can be previewed locally before the HA entity is enrolled. */}
@@ -419,7 +455,7 @@ export function AddDevice({ onNavigate }: Props) {
 						</button>
 						<button
 							type="submit"
-							disabled={isSubmitting}
+								disabled={isSubmitting || (sourceType === 'browser' && !browserDeviceId)}
 							class="flex items-center gap-2 bg-accent/100 hover:bg-accent/90 text-brand-bg font-mono font-bold text-sm px-6 py-3 rounded-xl transition-all shadow-md shadow-accent/20 disabled:opacity-50"
 						>
 							<span>{isSubmitting ? 'Adding...' : 'Add Camera'}</span>
