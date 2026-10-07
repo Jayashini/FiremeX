@@ -1,10 +1,7 @@
 // Camera handling for FiremeX.
 //
-// FiremeX never talks to a camera directly. Home Assistant owns every camera,
-// whatever it is - a laptop webcam, an RTSP CCTV camera, an ONVIF unit - and
-// FiremeX reads them back out of Home Assistant. That is what makes the
-// product work with equipment a customer already has: if Home Assistant can
-// see it, FiremeX can monitor it.
+// Home Assistant owns server cameras such as RTSP CCTV and ONVIF units.
+// Browser-local webcams send bounded still frames from an open Live Feed page.
 //
 // The flow:
 //
@@ -123,6 +120,7 @@ func AddCamera(c *gin.Context) {
 		DisplayName string `json:"display_name" binding:"required"`
 		Zone        string `json:"zone"`
 		AiEnabled   bool   `json:"ai_enabled"`
+		SourceType  string `json:"source_type"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -134,9 +132,16 @@ func AddCamera(c *gin.Context) {
 	if !ok {
 		return
 	}
-
+	if input.SourceType == "" {
+		input.SourceType = "home_assistant"
+	}
+	if input.SourceType != "home_assistant" && input.SourceType != "browser" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "source_type must be home_assistant or browser"})
+		return
+	}
 	camera := models.Camera{
 		EntityID:       input.EntityID,
+		SourceType:     input.SourceType,
 		DisplayName:    input.DisplayName,
 		Zone:           input.Zone,
 		AiEnabled:      input.AiEnabled,

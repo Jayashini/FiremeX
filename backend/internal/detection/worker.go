@@ -35,6 +35,7 @@ type Worker struct {
 	Store            *incidents.Store
 	Config           config.Config
 	mu               sync.Mutex
+	inferenceMu      sync.Mutex
 	statuses         map[uint]Status
 	cameras          []models.Camera
 	activeID         uint
@@ -53,6 +54,9 @@ func (w *Worker) Status(cam models.Camera) Status {
 	s.CameraID = cam.ID
 	if !w.Config.DetectionEnabled || !cam.AiEnabled {
 		s.State = "monitoring disabled"
+	} else if cam.SourceType == "browser" && (s.LastImage == nil || time.Since(*s.LastImage) > 2*w.Config.DetectionInterval+5*time.Second) {
+		s.State = "waiting for browser"
+		s.Failure = "Keep the Live Feed page open to send webcam frames for AI detection."
 	} else if w.discoveryWarning != "" {
 		s.State = "storage error"
 		s.Failure = w.discoveryWarning
@@ -91,8 +95,8 @@ func (w *Worker) cleanup(ctx context.Context) {
 func (w *Worker) reconcile(ctx context.Context) {
 	query, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	var cams []models.Camera
-	err := w.DB.WithContext(query).Where("ai_enabled = ?", true).Find(&cams).Error
+	var enabled []models.Camera
+	err := w.DB.WithContext(query).Where("ai_enabled = ?", true).Find(&enabled).Error
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err != nil {
@@ -101,10 +105,13 @@ func (w *Worker) reconcile(ctx context.Context) {
 		return
 	}
 	w.discoveryWarning = ""
-	w.cameras = cams
+	w.cameras = nil
 	alive := map[uint]bool{}
-	for _, c := range cams {
+	for _, c := range enabled {
 		alive[c.ID] = true
+		if c.SourceType != "browser" {
+			w.cameras = append(w.cameras, c)
+		}
 	}
 	if w.activeID != 0 && !alive[w.activeID] && w.cancel != nil {
 		w.cancel()
@@ -215,12 +222,40 @@ func (w *Worker) process(ctx context.Context, cam models.Camera, s Status) {
 		s.Failure = err.Error()
 		return
 	}
+	w.processFrame(ctx, cam, f, &s)
+}
+
+// ProcessBrowserFrame runs one authenticated browser upload through the same
+// model and incident store used by Home Assistant cameras.
+func (w *Worker) ProcessBrowserFrame(ctx context.Context, cam models.Camera, f cameras.Frame) (s Status) {
+	start := time.Now()
+	s = w.Status(cam)
+	s.CameraID = cam.ID
+	s.State = "starting"
+	s.Failure = ""
+	defer func() {
+		s.DurationMS = time.Since(start).Milliseconds()
+		s.NextDue = start.Add(w.Config.DetectionInterval)
+		if s.Failure != "" {
+			s.NextDue = time.Now().Add(5 * time.Second)
+		}
+		if ctx.Err() == nil {
+			w.update(s)
+		}
+	}()
+	w.processFrame(ctx, cam, f, &s)
+	return
+}
+
+func (w *Worker) processFrame(ctx context.Context, cam models.Camera, f cameras.Frame, s *Status) {
 	s.LastImage = &f.ReceivedAt
 	if s.LastSampleID == f.SampleID {
 		s.State = "monitoring"
 		return
 	}
+	w.inferenceMu.Lock()
 	result, err := w.Model.Detect(ctx, f, math.Min(w.Config.FireThreshold, w.Config.SmokeThreshold))
+	w.inferenceMu.Unlock()
 	if err != nil {
 		s.State = "model unavailable"
 		s.Failure = err.Error()
@@ -254,7 +289,7 @@ func (w *Worker) process(ctx context.Context, cam models.Camera, s Status) {
 		}
 		s.State = "storage error"
 		s.Failure = "incident persistence failed"
-		w.update(s)
+		w.update(*s)
 		if attempt < 2 {
 			select {
 			case <-ctx.Done():

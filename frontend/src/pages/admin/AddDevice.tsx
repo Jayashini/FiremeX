@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'preact/hooks'
 import { API } from '../../api'
+import { rememberBrowserWebcam } from '../../browserWebcams'
 
 type Props = {
 	onNavigate: (path: string) => void
@@ -11,7 +12,175 @@ type AvailableCamera = {
 	state: string
 }
 
+type BrowserCamera = {
+	deviceId: string
+	label: string
+}
+
+type SourceType = 'home_assistant' | 'browser'
+
+function webcamErrorMessage(error: unknown) {
+	if (!(error instanceof DOMException)) return 'The webcam could not be started.'
+
+	switch (error.name) {
+		case 'NotAllowedError':
+		case 'SecurityError':
+			return 'Camera permission was denied. Allow camera access for this site and try again.'
+		case 'NotFoundError':
+			return 'No webcam was found on this device.'
+		case 'NotReadableError':
+		case 'AbortError':
+			return 'The webcam is unavailable or is already being used by another application.'
+		case 'OverconstrainedError':
+			return 'The selected webcam is no longer available. Choose another camera.'
+		default:
+			return 'The webcam could not be started.'
+	}
+}
+
+function WebcamPreview({ onDeviceResolved }: { onDeviceResolved: (deviceId: string) => void }) {
+	const videoRef = useRef<HTMLVideoElement>(null)
+	const streamRef = useRef<MediaStream | null>(null)
+	const [cameras, setCameras] = useState<BrowserCamera[]>([])
+	const [selectedDeviceId, setSelectedDeviceId] = useState('')
+	const [status, setStatus] = useState<'requesting' | 'ready' | 'error'>('requesting')
+	const [error, setError] = useState('')
+	const [retry, setRetry] = useState(0)
+
+	const stopStream = () => {
+		streamRef.current?.getTracks().forEach((track) => track.stop())
+		streamRef.current = null
+		if (videoRef.current) videoRef.current.srcObject = null
+	}
+
+	useEffect(() => {
+		let cancelled = false
+
+		const startStream = async () => {
+			stopStream()
+			setStatus('requesting')
+			setError('')
+
+			if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+				setStatus('error')
+				setError('Webcam preview requires a secure page (HTTPS or localhost) and a supported browser.')
+				return
+			}
+
+			try {
+				const stream = await navigator.mediaDevices.getUserMedia({
+					audio: false,
+					video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+				})
+
+				if (cancelled) {
+					stream.getTracks().forEach((track) => track.stop())
+					return
+				}
+
+				streamRef.current = stream
+				const activeDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId
+				if (activeDeviceId) onDeviceResolved(activeDeviceId)
+				if (videoRef.current) {
+					videoRef.current.srcObject = stream
+					await videoRef.current.play()
+				}
+
+				const devices = await navigator.mediaDevices.enumerateDevices()
+				const videoInputs = devices
+					.filter((device) => device.kind === 'videoinput')
+					.map((device, index) => ({
+						deviceId: device.deviceId,
+						label: device.label || `Webcam ${index + 1}`
+					}))
+
+				if (cancelled) return
+				setCameras(videoInputs)
+				setStatus('ready')
+			} catch (err) {
+				if (cancelled) return
+				stopStream()
+				setStatus('error')
+				setError(webcamErrorMessage(err))
+			}
+		}
+
+		void startStream()
+		return () => {
+			cancelled = true
+			stopStream()
+		}
+	}, [selectedDeviceId, retry])
+
+	useEffect(() => {
+		if (!navigator.mediaDevices?.addEventListener) return
+		const refreshDevices = async () => {
+			try {
+				const devices = await navigator.mediaDevices.enumerateDevices()
+				const videoInputs = devices
+					.filter((device) => device.kind === 'videoinput')
+					.map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Webcam ${index + 1}` }))
+				setCameras(videoInputs)
+				if (selectedDeviceId && !videoInputs.some((device) => device.deviceId === selectedDeviceId)) {
+					setSelectedDeviceId('')
+				}
+			} catch {
+				// getUserMedia provides the actionable error state for this preview.
+			}
+		}
+
+		navigator.mediaDevices.addEventListener('devicechange', refreshDevices)
+		return () => navigator.mediaDevices.removeEventListener('devicechange', refreshDevices)
+	}, [selectedDeviceId])
+
+	return (
+		<div class="w-full flex flex-col gap-4">
+			{cameras.length > 1 && (
+				<div class="flex flex-col gap-2">
+					<label class="text-xs font-mono text-slate-400" for="browser-webcam">
+						Webcam on this device
+					</label>
+					<select
+						id="browser-webcam"
+						value={selectedDeviceId}
+						onChange={(event) => setSelectedDeviceId(event.currentTarget.value)}
+						class="w-full bg-[#050B0D] border border-[#8B949E]/20 focus:border-accent text-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors cursor-pointer"
+					>
+						{!selectedDeviceId && <option value="">Default webcam</option>}
+						{cameras.map((camera) => (
+							<option key={camera.deviceId} value={camera.deviceId}>{camera.label}</option>
+						))}
+					</select>
+				</div>
+			)}
+
+			<div class="w-full aspect-video rounded-xl bg-[#050B0D] border border-[#8B949E]/10 flex flex-col items-center justify-center gap-3 text-slate-500 overflow-hidden relative">
+				<video ref={videoRef} autoPlay playsInline muted class="w-full h-full object-contain" />
+				{status !== 'ready' && (
+					<div class="absolute inset-0 bg-[#050B0D] flex flex-col items-center justify-center gap-3 text-center px-6">
+						<svg class="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+						</svg>
+						<span class={`text-xs font-mono ${status === 'error' ? 'text-amber-400' : 'text-slate-400'}`} role={status === 'error' ? 'alert' : 'status'}>
+							{status === 'requesting' ? 'Requesting camera access…' : error}
+						</span>
+						{status === 'error' && (
+							<button type="button" class="text-xs font-mono text-accent hover:text-accent/80" onClick={() => setRetry((value) => value + 1)}>
+								Try again
+							</button>
+						)}
+					</div>
+				)}
+			</div>
+			<p class="text-[11px] text-slate-500 font-mono text-center">
+				This local webcam remains available while FireMeX is open in this browser.
+			</p>
+		</div>
+	)
+}
+
 export function AddDevice({ onNavigate }: Props) {
+	const [sourceType, setSourceType] = useState<SourceType>('home_assistant')
 	const [newCamName, setNewCamName] = useState('')
 	const [selectedEntityId, setSelectedEntityId] = useState('')
 	const [availableCameras, setAvailableCameras] = useState<AvailableCamera[]>([])
@@ -21,6 +190,8 @@ export function AddDevice({ onNavigate }: Props) {
 	const [newCamAi, setNewCamAi] = useState(false)
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [errorMsg, setErrorMsg] = useState('')
+	const [browserDeviceId, setBrowserDeviceId] = useState('')
+	const showBrowserWebcamPreview = sourceType === 'browser'
 
 	// Fetch available Home Assistant cameras on mount
 	useEffect(() => {
@@ -67,14 +238,36 @@ export function AddDevice({ onNavigate }: Props) {
 		}
 	}
 
+	const handleSourceType = (nextSource: SourceType) => {
+		setSourceType(nextSource)
+		setErrorMsg('')
+		setBrowserDeviceId('')
+		if (nextSource === 'browser') {
+			setNewCamName('Computer Webcam')
+		} else {
+			const selected = availableCameras.find((camera) => camera.entity_id === selectedEntityId)
+			setNewCamName(selected?.friendly_name ?? '')
+		}
+	}
+
 	const handleSubmitCamera = async (e: any) => {
 		e.preventDefault()
-		if (!selectedEntityId && availableCameras.length > 0) return
+		if (sourceType === 'home_assistant' && !selectedEntityId) {
+			setErrorMsg('Select or enter a Home Assistant camera entity.')
+			return
+		}
+		if (sourceType === 'browser' && !browserDeviceId) {
+			setErrorMsg('Allow camera access and wait for the webcam preview before adding it.')
+			return
+		}
 
 		setIsSubmitting(true)
 		setErrorMsg('')
 
 		try {
+			const entityId = sourceType === 'browser'
+				? `browser.${typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Date.now()}`
+				: selectedEntityId
 			const token = localStorage.getItem('firemex_token')
 			const res = await fetch(`${API}cameras`, {
 				method: 'POST',
@@ -83,7 +276,8 @@ export function AddDevice({ onNavigate }: Props) {
 					Authorization: `Bearer ${token}`
 				},
 				body: JSON.stringify({
-					entity_id: selectedEntityId || 'camera.demo_camera',
+					entity_id: entityId,
+					source_type: sourceType,
 					display_name: newCamName || 'New Camera Stream',
 					zone: newCamZone,
 					ai_enabled: newCamAi
@@ -93,6 +287,9 @@ export function AddDevice({ onNavigate }: Props) {
 			const data = await res.json()
 			if (!res.ok) {
 				throw new Error(data.error || 'Failed to add camera')
+			}
+			if (sourceType === 'browser' && browserDeviceId && data.camera?.ID) {
+				rememberBrowserWebcam(String(data.camera.ID), browserDeviceId)
 			}
 
 			onNavigate('/FiremeX/admin/livefeed')
@@ -119,7 +316,7 @@ export function AddDevice({ onNavigate }: Props) {
 					<div class="flex items-start justify-between mb-8">
 						<div>
 							<h1 class="text-[20px] font-semi-bold text-slate-300">Add New Device</h1>
-							<p class="text-sm text-[#8B949E] mt-1 mb-5">Select a Home Assistant camera entity to add to FiremeX.</p>
+							<p class="text-sm text-[#8B949E] mt-1 mb-5">Choose a webcam on this computer or a camera already connected to Home Assistant.</p>
 						</div>
 						<div class="p-3 bg-accent/10 border border-accent/20 rounded-xl text-accent">
 							<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -136,9 +333,23 @@ export function AddDevice({ onNavigate }: Props) {
 					)}
 
 					{/* Grid Fields */}
-					<div class="grid w-full grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-						{/* Home Assistant Camera Entity Dropdown */}
+					<div class="grid w-full grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+						{/* Camera Source */}
 						<div class="flex flex-col gap-2">
+							<label class="text-xs font-mono text-slate-400" for="camera-source">Camera Source</label>
+							<select
+								id="camera-source"
+								value={sourceType}
+								onChange={(event) => handleSourceType(event.currentTarget.value as SourceType)}
+								class="w-full bg-[#050B0D] border border-[#8B949E]/20 focus:border-accent text-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors cursor-pointer"
+							>
+								<option value="home_assistant">Home Assistant / CCTV</option>
+								<option value="browser">Webcam on this computer</option>
+							</select>
+						</div>
+
+						{/* Home Assistant Camera Entity Dropdown */}
+						{sourceType === 'home_assistant' && <div class="flex flex-col gap-2">
 							<label class="text-xs font-mono text-slate-400">Home Assistant Camera</label>
 							{isLoadingHA ? (
 								<div class="w-full bg-[#050B0D] border border-[#8B949E]/20 text-slate-400 rounded-xl px-4 py-3 text-sm animate-pulse">
@@ -171,7 +382,7 @@ export function AddDevice({ onNavigate }: Props) {
 									⚠️ HA API Warning: {haError} (Falling back to manual entity entry)
 								</span>
 							)}
-						</div>
+						</div>}
 
 						{/* Camera Display Name */}
 						<div class="flex flex-col gap-2">
@@ -203,8 +414,8 @@ export function AddDevice({ onNavigate }: Props) {
 							</select>
 						</div>
 
-						{/* Enable AI Tracking (toggle switch) */}
-						<div class="flex items-center gap-4 mt-6">
+						<div class="flex flex-col gap-2 mt-6">
+							<div class="flex items-center gap-4">
 							<button
 								type="button"
 								onClick={() => setNewCamAi(!newCamAi)}
@@ -213,19 +424,23 @@ export function AddDevice({ onNavigate }: Props) {
 								<span class={`absolute left-1 top-1 bg-brand-surface w-4 h-4 rounded-full transition-transform duration-200 ${newCamAi ? 'translate-x-6' : 'translate-x-0'}`} />
 							</button>
 							<span class="text-xs font-mono text-slate-400 select-none">Enable FiremeX AI Tracking</span>
+							</div>
+							{sourceType === 'browser' && <span class="text-[11px] font-mono text-slate-500">AI runs while the Live Feed page is open on this computer.</span>}
 						</div>
 					</div>
 
-					{/* Preview is available after enrollment: the snapshot API is scoped to saved cameras. */}
+					{/* Browser webcams can be previewed locally before the HA entity is enrolled. */}
 					<div class="border border-[#8B949E]/10 rounded-2xl p-5 mb-8 bg-[#050B0D]/50 flex flex-col items-center justify-center gap-4">
-						<div class="w-full aspect-video rounded-xl bg-[#050B0D] border border-[#8B949E]/10 flex flex-col items-center justify-center gap-3 text-slate-500 overflow-hidden relative">
-							<svg class="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-							</svg>
-							<span class="text-xs font-mono tracking-wider text-center px-4">
-								{selectedEntityId ? 'Live preview starts after adding this camera.' : 'Select a camera to add.'}
-							</span>
-						</div>
+						{showBrowserWebcamPreview ? <WebcamPreview onDeviceResolved={setBrowserDeviceId} /> : (
+							<div class="w-full aspect-video rounded-xl bg-[#050B0D] border border-[#8B949E]/10 flex flex-col items-center justify-center gap-3 text-slate-500 overflow-hidden relative">
+								<svg class="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+								</svg>
+								<span class="text-xs font-mono tracking-wider text-center px-4">
+									{selectedEntityId ? 'Live preview starts after adding this camera.' : 'Select a camera to add.'}
+								</span>
+							</div>
+						)}
 					</div>
 
 					{/* Action Buttons */}
@@ -239,7 +454,7 @@ export function AddDevice({ onNavigate }: Props) {
 						</button>
 						<button
 							type="submit"
-							disabled={isSubmitting}
+								disabled={isSubmitting || (sourceType === 'browser' && !browserDeviceId)}
 							class="flex items-center gap-2 bg-accent/100 hover:bg-accent/90 text-brand-bg font-mono font-bold text-sm px-6 py-3 rounded-xl transition-all shadow-md shadow-accent/20 disabled:opacity-50"
 						>
 							<span>{isSubmitting ? 'Adding...' : 'Add Camera'}</span>
