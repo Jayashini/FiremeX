@@ -27,9 +27,8 @@ type Camera struct {
 	DisplayName string `json:"display_name" gorm:"not null"`
 	Zone        string `json:"zone"`
 
-	// AiEnabled marks a Home Assistant camera for fire and smoke detection.
-	// Browser-local webcams cannot be sampled after the browser closes, so the
-	// API always stores them with detection disabled.
+	// AiEnabled marks a camera for fire and smoke detection. Browser-local
+	// webcams are sampled only while a Live Feed page is open on their device.
 	AiEnabled bool `json:"ai_enabled" gorm:"default:false"`
 
 	// Which organisation owns this camera. Every camera query filters on it -

@@ -60,6 +60,20 @@ func Validate(data []byte) (int, int, string, error) {
 	}
 	return cfg.Width, cfg.Height, "image/" + kind, nil
 }
+
+// NewFrame validates untrusted image bytes and assigns a unique sample ID.
+// It is shared by Home Assistant snapshots and browser webcam uploads.
+func NewFrame(data []byte) (Frame, error) {
+	w, h, kind, err := Validate(data)
+	if err != nil {
+		return Frame{}, err
+	}
+	id := make([]byte, 16)
+	if _, err = rand.Read(id); err != nil {
+		return Frame{}, err
+	}
+	return Frame{Data: data, ContentType: kind, ReceivedAt: time.Now().UTC(), SampleID: hex.EncodeToString(id), Width: w, Height: h}, nil
+}
 func (s *Service) Get(ctx context.Context, entity string) (Frame, error) {
 	for {
 		if err := ctx.Err(); err != nil {
@@ -117,13 +131,5 @@ func (s *Service) fetch(ctx context.Context, entity string) (Frame, error) {
 	if err != nil {
 		return Frame{}, fmt.Errorf("camera image read failed")
 	}
-	w, h, kind, err := Validate(b)
-	if err != nil {
-		return Frame{}, err
-	}
-	id := make([]byte, 16)
-	if _, err = rand.Read(id); err != nil {
-		return Frame{}, err
-	}
-	return Frame{b, kind, time.Now().UTC(), hex.EncodeToString(id), w, h}, nil
+	return NewFrame(b)
 }

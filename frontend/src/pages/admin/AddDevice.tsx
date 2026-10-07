@@ -242,7 +242,6 @@ export function AddDevice({ onNavigate }: Props) {
 		setSourceType(nextSource)
 		setErrorMsg('')
 		setBrowserDeviceId('')
-		setNewCamAi(false)
 		if (nextSource === 'browser') {
 			setNewCamName('Computer Webcam')
 		} else {
@@ -281,7 +280,7 @@ export function AddDevice({ onNavigate }: Props) {
 					source_type: sourceType,
 					display_name: newCamName || 'New Camera Stream',
 					zone: newCamZone,
-					ai_enabled: sourceType === 'home_assistant' && newCamAi
+					ai_enabled: newCamAi
 				})
 			})
 
@@ -415,8 +414,8 @@ export function AddDevice({ onNavigate }: Props) {
 							</select>
 						</div>
 
-						{/* Browser webcams are display-only until browser-to-server ingest is added. */}
-						{sourceType === 'home_assistant' ? <div class="flex items-center gap-4 mt-6">
+						<div class="flex flex-col gap-2 mt-6">
+							<div class="flex items-center gap-4">
 							<button
 								type="button"
 								onClick={() => setNewCamAi(!newCamAi)}
@@ -425,9 +424,9 @@ export function AddDevice({ onNavigate }: Props) {
 								<span class={`absolute left-1 top-1 bg-brand-surface w-4 h-4 rounded-full transition-transform duration-200 ${newCamAi ? 'translate-x-6' : 'translate-x-0'}`} />
 							</button>
 							<span class="text-xs font-mono text-slate-400 select-none">Enable FiremeX AI Tracking</span>
-						</div> : <div class="flex items-center mt-6 text-xs font-mono text-slate-500">
-							Browser webcam · local live view
-						</div>}
+							</div>
+							{sourceType === 'browser' && <span class="text-[11px] font-mono text-slate-500">AI runs while the Live Feed page is open on this computer.</span>}
+						</div>
 					</div>
 
 					{/* Browser webcams can be previewed locally before the HA entity is enrolled. */}

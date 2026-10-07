@@ -104,6 +104,7 @@ func main() {
 		protected.GET("/incidents/:id", controllers.GetIncident)
 		protected.GET("/incidents/:id/snapshot", controllers.IncidentSnapshot)
 		protected.GET("/detection/status", controllers.DetectionStatus)
+		protected.POST("/cameras/:id/browser-frame", controllers.BrowserCameraFrame)
 		protected.GET("/cameras/stream/:entity_id", controllers.StreamCamera)
 		// Single still frame. Used by the dashboard, because MJPEG does not
 		// work for RTSP cameras, and by the detection loop later.
