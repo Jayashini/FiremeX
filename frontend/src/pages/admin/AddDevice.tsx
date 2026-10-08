@@ -284,9 +284,20 @@ export function AddDevice({ onNavigate }: Props) {
 				})
 			})
 
-			const data = await res.json()
+			const responseText = await res.text()
+			let data: any = {}
+			if (responseText.trim()) {
+				try {
+					data = JSON.parse(responseText)
+				} catch {
+					throw new Error(`FireMeX API returned an invalid response (HTTP ${res.status}).`)
+				}
+			}
 			if (!res.ok) {
-				throw new Error(data.error || 'Failed to add camera')
+				throw new Error(data.error || `Could not reach the FireMeX backend (HTTP ${res.status}). Make sure the backend is running.`)
+			}
+			if (!data.camera?.ID) {
+				throw new Error('FireMeX added the camera but returned an incomplete response. Refresh the Live Feed page.')
 			}
 			if (sourceType === 'browser' && browserDeviceId && data.camera?.ID) {
 				rememberBrowserWebcam(String(data.camera.ID), browserDeviceId)
