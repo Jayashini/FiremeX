@@ -93,3 +93,4 @@ backend/data/
 # Supervisor demo generated evidence and local results
 backend/evidence/
 .demo-runtime/
+.firemex-runtime/

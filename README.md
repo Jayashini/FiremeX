@@ -5,8 +5,8 @@ safety operations. It gives organizations a real-time dashboard to watch camera
 feeds, review AI-detected fire/smoke incidents, manage alerts, and administer the
 operator team that responds to them.
 
-This repository is the **admin web app** — a single-page application built with
-Preact and Vite.
+This repository contains the FireMeX web app, Go API, local fire/smoke model,
+PostgreSQL database, and Home Assistant development environment.
 
 ## Features
 
@@ -22,10 +22,6 @@ Preact and Vite.
 - **Alerts** — Notification history filterable by time range and channel.
 - **Users** — Manage active users and approve/reject pending access requests.
 
-> **Note:** This is currently a **UI mockup**. There is no backend — data is
-> seeded from in-file fixtures and persisted to the browser's `localStorage`.
-> Authentication is not enforced (any login navigates to the dashboard).
-
 ## Tech stack
 
 | Layer | Tech |
@@ -40,15 +36,27 @@ History API), not a routing library.
 
 ## Getting started
 
-Requires Node.js (tested on v20).
+Requires Docker Desktop, Go, Node.js/npm, and Python 3.
 
 ```bash
-npm install     # install dependencies
-npm run dev     # start the dev server (http://localhost:3000)
+./start.sh
 ```
 
-Then open the printed local URL in your browser. The root path lands on the
-Login screen; sign in to reach the admin area.
+The first run installs missing frontend and Python dependencies. It then starts
+PostgreSQL, Home Assistant, the AI model, Go backend, and frontend and verifies
+that each service is ready. Open the printed URL:
+
+```text
+http://localhost:5173/FiremeX/login
+```
+
+The application services continue running after the terminal closes. Runtime
+logs are stored in `.firemex-runtime/`. Stop the complete system, including
+PostgreSQL and Home Assistant, with:
+
+```bash
+./stop.sh
+```
 
 ## Scripts
 
