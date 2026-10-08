@@ -61,6 +61,34 @@ export function TextField({ label, value, type = 'text', placeholder, onInput }:
 	)
 }
 
+type SelectProps = {
+	label: string
+	value: string
+	options: string[]
+	placeholder?: string
+	onChange: (value: string) => void
+}
+
+export function SelectField({ label, value, options, placeholder = 'Select an option', onChange }: SelectProps) {
+	return (
+		<label class="flex flex-col gap-2">
+			<span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</span>
+			<select
+				value={value}
+				onChange={(e) => onChange((e.target as HTMLSelectElement).value)}
+				class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
+			>
+				{placeholder && <option value="">{placeholder}</option>}
+				{options.map((opt) => (
+					<option key={opt} value={opt}>
+						{opt}
+					</option>
+				))}
+			</select>
+		</label>
+	)
+}
+
 /** Inline success or failure message under a form. */
 export function Notice({ text, tone }: { text: string; tone: 'ok' | 'error' }) {
 	if (!text) return null

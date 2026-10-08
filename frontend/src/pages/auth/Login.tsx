@@ -77,7 +77,7 @@ export function Login({ onNavigate, onSignedIn }: Props) {
 						type="email"
 						value={email}
 						onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
-						placeholder="name@company.com"
+						placeholder="Enter Organization/Employee Email"
 						class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-3.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-4 focus:ring-accent/10 transition-all"
 						required
 					/>

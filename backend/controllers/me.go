@@ -14,11 +14,12 @@ import (
 // field added to the model later cannot leak into an API response by accident.
 
 type organizationResponse struct {
-	ID     uint   `json:"id"`
-	Name   string `json:"name"`
-	Sector string `json:"sector"`
-	Email  string `json:"email"`
-	Phone  string `json:"phone"`
+	ID      uint   `json:"id"`
+	Name    string `json:"name"`
+	Sector  string `json:"sector"`
+	Email   string `json:"email"`
+	Phone   string `json:"phone"`
+	Country string `json:"country"`
 	// Code is the operator join code. Anyone holding it can request access to
 	// the organisation, so it is only ever sent to administrators.
 	Code string `json:"code,omitempty"`
@@ -49,11 +50,12 @@ func buildUserResponse(user models.User) userResponse {
 
 	if user.Organization != nil {
 		org := organizationResponse{
-			ID:     user.Organization.ID,
-			Name:   user.Organization.Name,
-			Sector: user.Organization.Sector,
-			Email:  user.Organization.Email,
-			Phone:  user.Organization.Phone,
+			ID:      user.Organization.ID,
+			Name:    user.Organization.Name,
+			Sector:  user.Organization.Sector,
+			Email:   user.Organization.Email,
+			Phone:   user.Organization.Phone,
+			Country: user.Organization.Country,
 		}
 		if user.Role == "admin" {
 			org.Code = user.Organization.Code

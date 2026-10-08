@@ -3,7 +3,8 @@ import { API } from '../../api'
 import type { Organization, SessionUser } from '../../session'
 import { authHeaders, saveUser } from '../../session'
 import { PageHeader } from '../../components/common/PageHeader'
-import { Card, Field, Notice, PrimaryButton, TextField } from '../../components/common/Card'
+import { Card, Field, Notice, PrimaryButton, SelectField, TextField } from '../../components/common/Card'
+import { COUNTRIES } from '../../constants/countries'
 
 type Props = {
 	user: SessionUser | null
@@ -24,6 +25,7 @@ export function Settings({ user, onNavigate, onUserUpdated }: Props) {
 	const [sector, setSector] = useState(user?.organization?.sector ?? '')
 	const [email, setEmail] = useState(user?.organization?.email ?? '')
 	const [phone, setPhone] = useState(user?.organization?.phone ?? '')
+	const [country, setCountry] = useState(user?.organization?.country ?? '')
 	const [saving, setSaving] = useState(false)
 	const [message, setMessage] = useState('')
 	const [error, setError] = useState('')
@@ -46,6 +48,7 @@ export function Settings({ user, onNavigate, onUserUpdated }: Props) {
 				setSector(d.organization.sector)
 				setEmail(d.organization.email)
 				setPhone(d.organization.phone ?? '')
+				setCountry(d.organization.country ?? '')
 			})
 			.catch(() => {})
 
@@ -76,7 +79,7 @@ export function Settings({ user, onNavigate, onUserUpdated }: Props) {
 			const response = await fetch(`${API}organization`, {
 				method: 'PATCH',
 				headers: authHeaders(),
-				body: JSON.stringify({ name, sector, email, phone })
+				body: JSON.stringify({ name, sector, email, phone, country })
 			})
 			const data = await response.json()
 			if (!response.ok) {
@@ -122,6 +125,7 @@ export function Settings({ user, onNavigate, onUserUpdated }: Props) {
 						<TextField label="Sector" value={sector} onInput={setSector} />
 						<TextField label="Contact email" value={email} type="email" onInput={setEmail} />
 						<TextField label="Phone" value={phone} onInput={setPhone} />
+						<SelectField label="Country" value={country} options={COUNTRIES} placeholder="Select Country" onChange={setCountry} />
 					</div>
 					<Notice text={message} tone="ok" />
 					<Notice text={error} tone="error" />
