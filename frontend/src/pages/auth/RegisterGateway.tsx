@@ -106,6 +106,11 @@ export function RegisterGateway({ onNavigate }: Props) {
 	const handleOperatorSubmit = async (e: Event) => {
 		e.preventDefault()
 
+		if (!/^[A-Z]{3}-[0-9]{3}$/.test(orgCode)) {
+			showToast('error', 'Organization code must be 3 uppercase letters, a hyphen, and 3 numbers (e.g. ORG-100)')
+			return
+		}
+
 		if (operatorPassword !== operatorConfirmPassword) {
 			showToast('error', 'Passwords do not match')
 			return
@@ -507,12 +512,15 @@ export function RegisterGateway({ onNavigate }: Props) {
 										placeholder="e.g. ORG-101"
 										value={orgCode}
 										onInput={(e) => setOrgCode((e.target as HTMLInputElement).value)}
+										pattern="[A-Z]{3}-[0-9]{3}"
+										maxLength={7}
+										title="Enter 3 uppercase letters, a hyphen, and 3 numbers (e.g. ORG-100)"
 										class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all font-mono"
 										required
 									/>
 
 								</div>
-								<p class="text-[9px] text-slate-400">Ask your Organization Administrator for their registration ID.</p>
+								<p class="text-[9px] text-slate-400">Enter 3 uppercase letters, a hyphen, and 3 numbers (e.g. ORG-100). Ask your Organization Administrator for the code.</p>
 							</div>
 
 							<div class="flex flex-col gap-1.5">
