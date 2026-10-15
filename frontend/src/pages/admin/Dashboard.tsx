@@ -17,6 +17,7 @@ const recentIncidents = [
 
 export function Dashboard({ onNavigate }: Props) {
 	const [timeStr, setTimeStr] = useState('')
+	const [unviewedCount] = useState(2)
 	// The camera count is the one figure on this page with a real source.
 	const [cameraCount, setCameraCount] = useState<number | null>(null)
 
@@ -61,12 +62,18 @@ export function Dashboard({ onNavigate }: Props) {
 					{/* Notification Bell */}
 					<button
 						type="button"
+						aria-label="Notifications"
 						class="relative flex items-center justify-center w-10 h-10 bg-brand-surface border border-brand-border hover:border-accent/40 rounded-xl text-slate-400 hover:text-slate-200 transition-colors"
 						onClick={() => onNavigate('/FiremeX/admin/alerts')}
 					>
 						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
 						</svg>
+						{unviewedCount > 0 && (
+							<span class="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold text-white">
+								{unviewedCount}
+							</span>
+						)}
 					</button>
 				</div>
 			</header>
