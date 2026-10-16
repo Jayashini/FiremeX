@@ -56,7 +56,7 @@ func demoDB(t *testing.T) *gorm.DB {
 		sql, _ = base.DB()
 		sql.Close()
 	})
-	if err = db.AutoMigrate(&models.Organization{}, &models.User{}, &models.Camera{}, &models.Incident{}); err != nil {
+	if err = db.AutoMigrate(&models.Organization{}, &models.User{}, &models.Camera{}, &models.Incident{}, &models.Alert{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -116,6 +116,11 @@ func TestSupervisorPipeline(t *testing.T) {
 	if count != 2 {
 		t.Fatalf("expected fire and smoke persisted by background worker, got %d", count)
 	}
+	var alertCount int64
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 2 {
+		t.Fatalf("expected one alert per incident, got %d", alertCount)
+	}
 	var rows []models.Incident
 	db.Order("id").Find(&rows)
 	if rows[0].ReviewStatus != "unconfirmed" || rows[0].ModelVersion != "stub-contract-only" || rows[0].SnapshotFile == "" {
@@ -129,6 +134,10 @@ func TestSupervisorPipeline(t *testing.T) {
 	if n, _, err := restart.Save(context.Background(), cam, f, result, thresholds); err != nil || n != 0 {
 		t.Fatalf("retry duplicated: %d %v", n, err)
 	}
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 2 {
+		t.Fatalf("retry duplicated alerts: %d", alertCount)
+	}
 	now = now.Add(2 * time.Minute)
 	if n, _, err := restart.Save(context.Background(), cam, f, result, thresholds); err != nil || n != 0 {
 		t.Fatalf("idempotency after cooldown failed: %d %v", n, err)
@@ -137,11 +146,36 @@ func TestSupervisorPipeline(t *testing.T) {
 	if n, _, err := restart.Save(context.Background(), cam, f, result, thresholds); err != nil || n != 1 {
 		t.Fatalf("new window failed: %d %v", n, err)
 	}
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 3 {
+		t.Fatalf("new incident did not create an alert: %d", alertCount)
+	}
+	if err := incidents.BackfillAlerts(db); err != nil {
+		t.Fatal(err)
+	}
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 3 {
+		t.Fatalf("backfill duplicated alerts: %d", alertCount)
+	}
+	// Simulate an incident created before notifications existed.
+	if err := db.Where("incident_id = ?", rows[0].ID).Delete(&models.Alert{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := incidents.BackfillAlerts(db); err != nil {
+		t.Fatal(err)
+	}
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 3 {
+		t.Fatalf("backfill failed to restore a missing alert: %d", alertCount)
+	}
 	router := gin.New()
 	api := router.Group("/api", middleware.RequireAuth)
 	api.GET("/incidents", controllers.GetIncidents)
 	api.GET("/incidents/:id", controllers.GetIncident)
 	api.GET("/incidents/:id/snapshot", controllers.IncidentSnapshot)
+	api.PATCH("/incidents/:id/status", controllers.UpdateIncidentStatus)
+	api.GET("/alerts", controllers.GetAlerts)
+	api.PATCH("/alerts/:id/acknowledge", controllers.AcknowledgeAlert)
 	api.GET("/detection/status", controllers.DetectionStatus)
 	api.PATCH("/cameras/:id/detection", middleware.RequireAdmin, controllers.ToggleDetection)
 	request := func(user models.User, method, path, body string, cookie bool) *httptest.ResponseRecorder {
@@ -182,6 +216,66 @@ func TestSupervisorPipeline(t *testing.T) {
 		if rr.Code != check.code {
 			t.Errorf("%s %s got %d want %d: %s", check.method, check.path, rr.Code, check.code, rr.Body.String())
 		}
+	}
+	var firstAlert models.Alert
+	db.Where("incident_id = ?", rows[0].ID).First(&firstAlert)
+	alertPath := fmt.Sprintf("/api/alerts/%d/acknowledge", firstAlert.ID)
+	statusPath := path + "/status"
+	responseChecks := []struct {
+		user               models.User
+		method, path, body string
+		code               int
+	}{
+		{operator, "PATCH", statusPath, `{"status":"resolved"}`, 400},
+		{operator, "PATCH", statusPath, `{"status":"invalid"}`, 400},
+		{outsider, "PATCH", statusPath, `{"status":"in_progress"}`, 404},
+		{outsider, "PATCH", alertPath, "", 404},
+		{admin, "GET", "/api/alerts?acknowledged=maybe", "", 400},
+		{operator, "PATCH", statusPath, `{"status":"in_progress"}`, 200},
+		{operator, "PATCH", statusPath, `{"status":"unresolved","blocker_reason":"Waiting for maintenance"}`, 200},
+		{operator, "PATCH", statusPath, `{"status":"in_progress"}`, 200},
+		{operator, "PATCH", statusPath, `{"status":"resolved","note":"Area checked"}`, 200},
+		{admin, "PATCH", alertPath, "", 200},
+		{admin, "PATCH", alertPath, "", 200},
+	}
+	for _, check := range responseChecks {
+		rr := request(check.user, check.method, check.path, check.body, false)
+		if rr.Code != check.code {
+			t.Errorf("%s %s got %d want %d: %s", check.method, check.path, rr.Code, check.code, rr.Body.String())
+		}
+	}
+	var updated models.Incident
+	db.First(&updated, rows[0].ID)
+	if updated.Status != models.IncidentStatusResolved || updated.ResolveNote != "Area checked" || updated.ResolvedByID == nil || *updated.ResolvedByID != operator.ID || updated.ResponseUpdatedAt == nil {
+		t.Fatal("response audit not saved")
+	}
+	if updated.BlockerReason != "" || updated.SnapshotFile == "" {
+		t.Fatal("response update altered evidence or kept an old blocker")
+	}
+	db.First(&firstAlert, firstAlert.ID)
+	if firstAlert.AcknowledgedAt == nil || firstAlert.AcknowledgedByID == nil || *firstAlert.AcknowledgedByID != admin.ID {
+		t.Fatal("acknowledgement not saved separately")
+	}
+	if rr := request(operator, "PATCH", statusPath, `{"status":"unresolved"}`, false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"resolved_at":null`) {
+		t.Fatal("reopen response failed:", rr.Body.String())
+	}
+	updated = models.Incident{}
+	db.First(&updated, rows[0].ID)
+	if updated.Status != models.IncidentStatusUnresolved || updated.ResolvedAt != nil {
+		t.Fatal("reopen was not persisted")
+	}
+	db.First(&firstAlert, firstAlert.ID)
+	if firstAlert.AcknowledgedAt == nil {
+		t.Fatal("reopening incident changed notification acknowledgement")
+	}
+	if rr := request(admin, "GET", "/api/alerts?after_id=0&page_size=1", "", false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"filtered_total":3`) {
+		t.Fatal("alert cursor failed:", rr.Body.String())
+	}
+	if rr := request(outsider, "GET", "/api/alerts", "", false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"alerts":[]`) {
+		t.Fatal("other organization saw alerts")
+	}
+	if rr := request(models.User{}, "GET", "/api/alerts", "", false); rr.Code != 401 {
+		t.Fatal("anonymous alerts access")
 	}
 	rr := request(admin, "GET", "/api/incidents?page_size=1", "", false)
 	var listing struct {

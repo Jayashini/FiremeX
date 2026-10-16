@@ -130,11 +130,11 @@ type Incident struct {
 
 	// Who closed it, and when. Pointers because both are empty until somebody
 	// does - a zero time.Time would read as 1 January year 1, which is a lie.
-	ResolvedByID *uint      `json:"resolved_by_id"`
-	ResolvedBy   *User      `json:"resolved_by,omitempty" gorm:"foreignKey:ResolvedByID"`
-	ResolvedAt   *time.Time `json:"resolved_at"`
-	ResponseUpdatedByID *uint `json:"response_updated_by_id"`
-	ResponseUpdatedAt *time.Time `json:"response_updated_at"`
+	ResolvedByID        *uint      `json:"resolved_by_id"`
+	ResolvedBy          *User      `json:"resolved_by,omitempty" gorm:"foreignKey:ResolvedByID"`
+	ResolvedAt          *time.Time `json:"resolved_at"`
+	ResponseUpdatedByID *uint      `json:"response_updated_by_id"`
+	ResponseUpdatedAt   *time.Time `json:"response_updated_at"`
 
 	// ---------------------------------------------------------------- computed
 

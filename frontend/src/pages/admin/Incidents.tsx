@@ -4,7 +4,7 @@ import { authHeaders } from '../../session'
 import type { Incident } from '../../types/incident'
 import { IncidentDetail } from '../../components/incidents/IncidentDetail'
 
-export function Incidents() {
+export function Incidents({ openIncidentId, onIncidentClosed }: { openIncidentId?: number | null; onIncidentClosed?: () => void }) {
  const [rows, setRows] = useState<Incident[]>([])
  const [total, setTotal] = useState(0)
  const [page, setPage] = useState(1)
@@ -17,6 +17,14 @@ export function Incidents() {
  const [newCount, setNewCount] = useState(0)
  const [selected, setSelected] = useState<Incident | null>(null)
  const highest = useRef<number | null>(null)
+ useEffect(() => {
+  if (!openIncidentId) return
+  const abort = new AbortController()
+  fetch(`${API}incidents/${openIncidentId}`, { headers: authHeaders(), credentials: 'include', signal: abort.signal })
+   .then(async res => { if (!res.ok) throw new Error(`Could not open incident (HTTP ${res.status})`); setSelected(await res.json() as Incident) })
+   .catch(err => { if (!abort.signal.aborted) setError(err.message) })
+  return () => abort.abort()
+ }, [openIncidentId])
  useEffect(() => {
   let stopped = false, running = false, timer = 0
   let abort: AbortController | null = null
@@ -62,11 +70,11 @@ export function Incidents() {
   <p class="text-xs text-slate-500">{loading ? 'Refreshing… ' : ''}{lastRefresh ? `Last successful refresh: ${lastRefresh.toLocaleTimeString()}` : 'Waiting for first refresh'}</p>
   <div class="overflow-x-auto rounded-2xl border border-brand-border">
    <table class="w-full text-left text-sm"><thead class="bg-brand-surface text-slate-400"><tr>{['Reference / observed','Camera / zone','Class','Confidence','Review','Response','Evidence'].map(h => <th key={h} class="p-4 font-medium">{h}</th>)}</tr></thead>
-    <tbody>{rows.map(row => <tr key={row.id} class="border-t border-brand-border"><td class="p-4 font-mono">{row.reference}<div class="text-xs text-slate-400 mt-1">{new Date(row.observed_at ?? row.created_at).toLocaleString()}</div></td><td class="p-4">{row.camera_name}<div class="text-xs text-slate-400">{row.zone || '—'}</div></td><td class={`p-4 capitalize ${row.class === 'fire' ? 'text-red-400' : 'text-amber-300'}`}>{row.class}</td><td class="p-4">{(row.confidence * 100).toFixed(1)}%</td><td class="p-4">{row.review_status}</td><td class="p-4">{row.status.replaceAll('_', ' ')}</td><td class="p-4"><button class="text-accent underline" onClick={() => setSelected(row)}>{row.has_snapshot ? 'View evidence' : `Details · ${row.evidence_status}`}</button></td></tr>)}</tbody>
+    <tbody>{rows.map(row => <tr key={row.id} class="border-t border-brand-border"><td class="p-4 font-mono">{row.reference}<div class="text-xs text-slate-400 mt-1">{new Date(row.observed_at ?? row.created_at).toLocaleString()}</div></td><td class="p-4">{row.camera_name}<div class="text-xs text-slate-400">{row.zone || '—'}</div></td><td class={`p-4 capitalize ${row.class === 'fire' ? 'text-red-400' : 'text-amber-300'}`}>{row.class}</td><td class="p-4">{(row.confidence * 100).toFixed(1)}%</td><td class="p-4">{row.review_status}</td><td class="p-4"><span class={`rounded-full px-2 py-1 text-xs ${row.status === 'resolved' ? 'bg-emerald-500/15 text-emerald-300' : row.status === 'in_progress' ? 'bg-blue-500/15 text-blue-300' : 'bg-amber-500/15 text-amber-300'}`}>{row.status.replaceAll('_', ' ')}</span></td><td class="p-4"><button type="button" class="text-accent underline" onClick={() => setSelected(row)}>Open incident</button></td></tr>)}</tbody>
    </table>
    {!loading && !error && rows.length === 0 && <p class="py-16 text-center text-slate-400">No incidents match this view.</p>}
   </div>
   <div class="flex items-center justify-between"><p class="text-sm text-slate-400">{total} records · Page {page} of {Math.max(1, Math.ceil(total / 25))}</p><div class="flex gap-4"><button class={input} disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</button><button class={input} disabled={page * 25 >= total} onClick={() => setPage(p => p + 1)}>Next</button></div></div>
-  {selected && <IncidentDetail incident={selected} onClose={() => setSelected(null)} />}
+  {selected && <IncidentDetail incident={selected} onClose={() => { setSelected(null); onIncidentClosed?.() }} onUpdated={updated => { setSelected(updated); setRows(old => old.map(row => row.id === updated.id ? updated : row)) }} />}
  </div>
 }

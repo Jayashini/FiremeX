@@ -10,7 +10,9 @@ import (
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -171,4 +173,67 @@ func IncidentSnapshot(c *gin.Context) {
 		return
 	}
 	c.Data(200, "image/jpeg", b)
+}
+
+type incidentStatusRequest struct {
+	Status        string `json:"status"`
+	Note          string `json:"note"`
+	BlockerReason string `json:"blocker_reason"`
+}
+
+func UpdateIncidentStatus(c *gin.Context) {
+	user, ok := currentUser(c)
+	if !ok {
+		return
+	}
+	id, err := positive(c.Param("id"))
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Invalid incident ID"})
+		return
+	}
+	var request incidentStatusRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid status request"})
+		return
+	}
+	request.Note = strings.TrimSpace(request.Note)
+	request.BlockerReason = strings.TrimSpace(request.BlockerReason)
+	if !models.ValidIncidentStatus(request.Status) || len(request.Note) > 2000 || len(request.BlockerReason) > 2000 ||
+		(request.Status == models.IncidentStatusResolved && request.Note == "") ||
+		(request.BlockerReason != "" && request.Status != models.IncidentStatusUnresolved) {
+		c.JSON(400, gin.H{"error": "Invalid status, note or blocker reason"})
+		return
+	}
+	var row models.Incident
+	err = database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND organization_id = ?", id, *user.OrganizationID).First(&row).Error; err != nil {
+			return err
+		}
+		now := time.Now().UTC()
+		values := map[string]any{"status": request.Status, "response_updated_by_id": user.ID, "response_updated_at": now, "blocker_reason": request.BlockerReason}
+		if request.Status == models.IncidentStatusResolved {
+			values["resolve_note"] = request.Note
+			values["resolved_by_id"] = user.ID
+			values["resolved_at"] = now
+		} else {
+			values["resolve_note"] = ""
+			values["resolved_by_id"] = nil
+			values["resolved_at"] = nil
+		}
+		if err := tx.Model(&row).Updates(values).Error; err != nil {
+			return err
+		}
+		row = models.Incident{}
+		return tx.First(&row, id).Error
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(404, gin.H{"error": "Incident not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(503, gin.H{"error": "Incident storage unavailable"})
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(200, incidentDTO(row))
 }

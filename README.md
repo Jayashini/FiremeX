@@ -13,13 +13,10 @@ PostgreSQL database, and Home Assistant development environment.
 - **Authentication** — Login, plus a registration gateway that supports two paths:
   registering a new **Organization** (which generates a unique org code) or
   requesting **Operator** access to an existing organization (approval-gated).
-- **Dashboard** — Real-time situation overview with a live clock and recent
-  incident summary.
+- **Dashboard** — Current camera, incident, and notification counts with recent activity.
 - **Live Feed** — Grid of monitored cameras; add and manage devices.
-- **Incidents** — Detection history log with search, camera/status filters, and
-  a resolve/blocker workflow (mark incidents Unresolved / In Progress / Resolved
-  with notes).
-- **Alerts** — Notification history filterable by time range and channel.
+- **Incidents** — Fire and smoke detections with evidence, response status, and notes. Operators and administrators can start a response, report a blocker, resolve with a note, or reopen an incident.
+- **Notifications** — Each detected incident creates one persisted in-app notification. Users can acknowledge it and open its incident; acknowledgement never resolves the incident. New detections appear in a top-right notification while the app is open.
 - **Users** — Manage active users and approve/reject pending access requests.
 
 ## Tech stack
@@ -78,7 +75,7 @@ src/
   pages/
     auth/               Login, RegisterGateway (+ password screens)
     admin/              Dashboard, Livefeed, AddDevice, Incidents,
-                        Alerts, User, Profile
+                        Notifications, User, Profile
   index.css             Tailwind import + theme tokens and global styles
 public/                 Static assets (logo, images)
 ```
