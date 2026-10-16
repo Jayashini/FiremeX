@@ -11,6 +11,7 @@ import (
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func alertDTO(row models.Alert) gin.H {
@@ -20,7 +21,9 @@ func alertDTO(row models.Alert) gin.H {
 		"organization_id":    row.OrganizationID, "class": row.HazardClass,
 		"confidence": row.Confidence, "camera_name": row.CameraName, "zone": row.Zone,
 		"created_at": row.CreatedAt, "acknowledged_at": row.AcknowledgedAt,
-		"acknowledged_by_id": row.AcknowledgedByID,
+		"acknowledged_by_id":   row.AcknowledgedByID,
+		"acknowledged_by_name": row.AcknowledgedByName,
+		"acknowledged_by_role": row.AcknowledgedByRole,
 	}
 }
 
@@ -105,6 +108,10 @@ func AcknowledgeAlert(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !incidentResponderRole(user.Role) {
+		c.JSON(403, gin.H{"error": "Only administrators and operators can acknowledge notifications"})
+		return
+	}
 	id, err := positive(c.Param("id"))
 	if err != nil {
 		c.JSON(400, gin.H{"error": "Invalid alert ID"})
@@ -112,12 +119,12 @@ func AcknowledgeAlert(c *gin.Context) {
 	}
 	var row models.Alert
 	err = database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ? AND organization_id = ?", id, *user.OrganizationID).First(&row).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND organization_id = ?", id, *user.OrganizationID).First(&row).Error; err != nil {
 			return err
 		}
 		if row.AcknowledgedAt == nil {
 			now := time.Now().UTC()
-			result := tx.Model(&models.Alert{}).Where("id = ? AND organization_id = ? AND acknowledged_at IS NULL", id, *user.OrganizationID).Updates(map[string]any{"acknowledged_at": now, "acknowledged_by_id": user.ID})
+			result := tx.Model(&models.Alert{}).Where("id = ? AND organization_id = ? AND acknowledged_at IS NULL", id, *user.OrganizationID).Updates(map[string]any{"acknowledged_at": now, "acknowledged_by_id": user.ID, "acknowledged_by_name": user.Name, "acknowledged_by_role": user.Role})
 			if result.Error != nil {
 				return result.Error
 			}

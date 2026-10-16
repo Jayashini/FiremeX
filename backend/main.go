@@ -47,6 +47,7 @@ func main() {
 		&models.Camera{},
 		&models.Incident{},
 		&models.Alert{},
+		&models.IncidentResponseAction{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database: ", err)
@@ -54,6 +55,12 @@ func main() {
 	log.Println("Database migration completed!")
 	if err := incidents.BackfillAlerts(database.DB); err != nil {
 		log.Fatal("Failed to backfill incident alerts: ", err)
+	}
+	if err := incidents.BackfillAlertActors(database.DB); err != nil {
+		log.Fatal("Failed to backfill alert acknowledgers: ", err)
+	}
+	if err := incidents.BackfillIncidentResponseActions(database.DB); err != nil {
+		log.Fatal("Failed to backfill incident response actors: ", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

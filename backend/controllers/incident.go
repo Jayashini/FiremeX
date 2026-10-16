@@ -18,6 +18,10 @@ import (
 
 var IncidentStore *incidents.Store
 
+var errNotIncidentResponder = errors.New("only the user who acknowledged the notification can update this incident")
+
+func incidentResponderRole(role string) bool { return role == "admin" || role == "operator" }
+
 func positive(raw string) (uint, error) {
 	n, e := strconv.ParseUint(raw, 10, 32)
 	if e != nil || n == 0 {
@@ -55,6 +59,26 @@ func incidentDTO(row models.Incident) gin.H {
 		result["snapshot_url"] = fmt.Sprintf("/api/incidents/%d/snapshot", row.ID)
 	}
 	return result
+}
+
+func incidentDetailDTO(db *gorm.DB, row models.Incident, user models.User) (gin.H, error) {
+	result := incidentDTO(row)
+	var alert models.Alert
+	if err := db.Where("incident_id = ? AND organization_id = ?", row.ID, row.OrganizationID).First(&alert).Error; err != nil {
+		return nil, err
+	}
+	var actions []models.IncidentResponseAction
+	if err := db.Where("incident_id = ? AND organization_id = ?", row.ID, row.OrganizationID).Order("id ASC").Find(&actions).Error; err != nil {
+		return nil, err
+	}
+	result["acknowledged_at"] = alert.AcknowledgedAt
+	result["alert_id"] = alert.ID
+	result["acknowledged_by_id"] = alert.AcknowledgedByID
+	result["acknowledged_by_name"] = alert.AcknowledgedByName
+	result["acknowledged_by_role"] = alert.AcknowledgedByRole
+	result["can_respond"] = incidentResponderRole(user.Role) && alert.AcknowledgedByID != nil && *alert.AcknowledgedByID == user.ID
+	result["response_actions"] = actions
+	return result, nil
 }
 func GetIncidents(c *gin.Context) {
 	org, ok := currentOrgID(c)
@@ -148,8 +172,17 @@ func findIncident(c *gin.Context) (models.Incident, bool) {
 func GetIncident(c *gin.Context) {
 	r, ok := findIncident(c)
 	if ok {
+		user, valid := currentUser(c)
+		if !valid {
+			return
+		}
+		dto, err := incidentDetailDTO(database.DB.WithContext(c.Request.Context()), r, user)
+		if err != nil {
+			c.JSON(503, gin.H{"error": "Incident response details unavailable"})
+			return
+		}
 		c.Header("Cache-Control", "no-store")
-		c.JSON(200, incidentDTO(r))
+		c.JSON(200, dto)
 	}
 }
 func IncidentSnapshot(c *gin.Context) {
@@ -186,6 +219,10 @@ func UpdateIncidentStatus(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !incidentResponderRole(user.Role) {
+		c.JSON(403, gin.H{"error": "Only administrators and operators can update incidents"})
+		return
+	}
 	id, err := positive(c.Param("id"))
 	if err != nil {
 		c.JSON(400, gin.H{"error": "Invalid incident ID"})
@@ -209,6 +246,13 @@ func UpdateIncidentStatus(c *gin.Context) {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND organization_id = ?", id, *user.OrganizationID).First(&row).Error; err != nil {
 			return err
 		}
+		var alert models.Alert
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("incident_id = ? AND organization_id = ?", id, *user.OrganizationID).First(&alert).Error; err != nil {
+			return err
+		}
+		if alert.AcknowledgedByID == nil || *alert.AcknowledgedByID != user.ID {
+			return errNotIncidentResponder
+		}
 		now := time.Now().UTC()
 		values := map[string]any{"status": request.Status, "response_updated_by_id": user.ID, "response_updated_at": now, "blocker_reason": request.BlockerReason}
 		if request.Status == models.IncidentStatusResolved {
@@ -223,6 +267,9 @@ func UpdateIncidentStatus(c *gin.Context) {
 		if err := tx.Model(&row).Updates(values).Error; err != nil {
 			return err
 		}
+		if err := tx.Create(&models.IncidentResponseAction{IncidentID: id, OrganizationID: *user.OrganizationID, ActorID: user.ID, ActorName: user.Name, ActorRole: user.Role, Status: request.Status, Note: request.Note, BlockerReason: request.BlockerReason, CreatedAt: now}).Error; err != nil {
+			return err
+		}
 		row = models.Incident{}
 		return tx.First(&row, id).Error
 	})
@@ -230,10 +277,19 @@ func UpdateIncidentStatus(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "Incident not found"})
 		return
 	}
+	if errors.Is(err, errNotIncidentResponder) {
+		c.JSON(403, gin.H{"error": errNotIncidentResponder.Error()})
+		return
+	}
 	if err != nil {
 		c.JSON(503, gin.H{"error": "Incident storage unavailable"})
 		return
 	}
 	c.Header("Cache-Control", "no-store")
-	c.JSON(200, incidentDTO(row))
+	dto, err := incidentDetailDTO(database.DB.WithContext(c.Request.Context()), row, user)
+	if err != nil {
+		c.JSON(503, gin.H{"error": "Incident response details unavailable"})
+		return
+	}
+	c.JSON(200, dto)
 }

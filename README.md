@@ -15,8 +15,8 @@ PostgreSQL database, and Home Assistant development environment.
   requesting **Operator** access to an existing organization (approval-gated).
 - **Dashboard** — Current camera, incident, and notification counts with recent activity.
 - **Live Feed** — Grid of monitored cameras; add and manage devices.
-- **Incidents** — Fire and smoke detections with evidence, response status, and notes. Operators and administrators can start a response, report a blocker, resolve with a note, or reopen an incident.
-- **Notifications** — Each detected incident creates one persisted in-app notification. Users can acknowledge it and open its incident; acknowledgement never resolves the incident. New detections appear in a top-right notification while the app is open.
+- **Incidents** — Fire and smoke detections with evidence, response status, and notes. Everyone in the organization can view an incident and its response history. Only the user who acknowledged its linked notification can start a response, keep it unresolved with a reason, resolve it with a note, or reopen it. Each response action records the user's name and role at the time.
+- **Notifications** — Each detected incident creates one persisted in-app notification. Open the incident from the notification toast or Notifications page to see evidence and acknowledge it in the incident detail. The first user to acknowledge it becomes the response owner; their name and role are saved and visible to the organization. Acknowledgement does not resolve the incident. New detections appear in a top-right notification while the app is open.
 - **Users** — Manage active users and approve/reject pending access requests.
 
 ## Tech stack
