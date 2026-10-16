@@ -4,7 +4,7 @@ import { authHeaders } from '../../session'
 import type { Alert, AlertList, Incident } from '../../types/incident'
 
 type Summary = {
- cameras: number; incidents: number; unresolved: number; inProgress: number; alerts: number; unacknowledged: number
+ cameras: number; incidents: number; unresolved: number; inProgress: number; activeOperators: number; activeAdmins: number; unacknowledged: number
  recentIncidents: Incident[]; recentAlerts: Alert[]; featured: Incident | null
 }
 
@@ -26,15 +26,17 @@ export function Dashboard({ onNavigate, onViewIncident }: { onNavigate: (path: s
    if (document.hidden || running) return
    running = true
    try {
-    const paths = ['cameras', 'incidents?page_size=5', 'incidents?page_size=1&status=unresolved', 'incidents?page_size=1&status=in_progress', 'alerts?page_size=5', 'incidents?page_size=1&class=fire']
+    const paths = ['cameras', 'incidents?page_size=5', 'incidents?page_size=1&status=unresolved', 'incidents?page_size=1&status=in_progress', 'alerts?page_size=5', 'incidents?page_size=1&class=fire', 'users']
     const responses = await Promise.all(paths.map(path => fetch(`${API}${path}`, { headers: authHeaders(), credentials: 'include', signal: abort.signal })))
     if (responses.some(response => !response.ok)) throw new Error('Some dashboard data is unavailable')
-    const [cameras, incidents, unresolved, inProgress, alerts, fires] = await Promise.all(responses.map(response => response.json())) as [
-     { cameras: unknown[] }, { incidents: Incident[]; total: number }, { total: number }, { total: number }, AlertList, { incidents: Incident[] }
+    const [cameras, incidents, unresolved, inProgress, alerts, fires, users] = await Promise.all(responses.map(response => response.json())) as [
+     { cameras: unknown[] }, { incidents: Incident[]; total: number }, { total: number }, { total: number }, AlertList, { incidents: Incident[] }, { active: { role: string }[] }
     ]
     if (abort.signal.aborted) return
     const featured = fires.incidents.find(row => row.has_snapshot) ?? incidents.incidents.find(row => row.has_snapshot) ?? null
-    setSummary({ cameras: cameras.cameras?.length ?? 0, incidents: incidents.total, unresolved: unresolved.total, inProgress: inProgress.total, alerts: alerts.total, unacknowledged: alerts.unacknowledged, recentIncidents: incidents.incidents, recentAlerts: alerts.alerts, featured })
+    const activeOperators = users.active?.filter(user => user.role.toLowerCase() === 'operator').length ?? 0
+    const activeAdmins = users.active?.filter(user => user.role.toLowerCase() === 'admin').length ?? 0
+    setSummary({ cameras: cameras.cameras?.length ?? 0, incidents: incidents.total, unresolved: unresolved.total, inProgress: inProgress.total, activeOperators, activeAdmins, unacknowledged: alerts.unacknowledged, recentIncidents: incidents.incidents, recentAlerts: alerts.alerts, featured })
     setLastRefresh(new Date()); setError('')
    } catch (err) { if (!abort.signal.aborted) setError(err instanceof Error ? err.message : 'Dashboard unavailable') }
    finally { running = false }
@@ -64,7 +66,7 @@ export function Dashboard({ onNavigate, onViewIncident }: { onNavigate: (path: s
   { label: 'Cameras', value: summary?.cameras, hint: 'View live feeds', symbol: '▣', color: 'text-teal-300', tint: 'from-teal-400/10', path: '/FiremeX/admin/livefeed' },
   { label: 'Total incidents', value: summary?.incidents, hint: 'Detection history', symbol: '◇', color: 'text-orange-300', tint: 'from-orange-400/10', path: '/FiremeX/admin/incidents' },
   { label: 'Open responses', value: summary ? summary.unresolved + summary.inProgress : undefined, hint: summary ? `${summary.unresolved} unresolved · ${summary.inProgress} in progress` : 'Awaiting data', symbol: '◌', color: 'text-sky-300', tint: 'from-sky-400/10', path: '/FiremeX/admin/incidents' },
-  { label: 'Notifications', value: summary?.alerts, hint: summary ? `${summary.unacknowledged} need acknowledgement` : 'Awaiting data', symbol: '♧', color: 'text-amber-300', tint: 'from-amber-400/10', path: '/FiremeX/admin/alerts' },
+  { label: 'Active operators + admins', value: summary ? summary.activeOperators + summary.activeAdmins : undefined, hint: summary ? `${summary.activeOperators} operator${summary.activeOperators === 1 ? '' : 's'} · ${summary.activeAdmins} admin${summary.activeAdmins === 1 ? '' : 's'}` : 'Awaiting data', symbol: '♙', color: 'text-emerald-300', tint: 'from-emerald-400/10', path: '/FiremeX/admin/users' },
  ]
 
  return <div class="mx-auto max-w-[1500px] space-y-7 p-5 pb-12 sm:p-7 lg:p-9">
