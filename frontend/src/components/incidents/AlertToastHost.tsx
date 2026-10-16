@@ -27,7 +27,9 @@ export function AlertToastHost({ onViewIncident }: { onViewIncident: (id: number
      const data = await res.json() as AlertList
      if (stopped || data.alerts.length === 0) return
      watermark.current = data.alerts[data.alerts.length - 1].id
-     setToasts(old => [...old, ...data.alerts.filter(alert => !old.some(item => item.id === alert.id))])
+     // Keep the cursor over every alert, but only interrupt the user for
+     // detections that still need acknowledgement when this poll returns.
+     setToasts(old => [...old, ...data.alerts.filter(alert => !alert.acknowledged_at && !old.some(item => item.id === alert.id))])
      if (data.alerts.length < 100) return
     }
    } catch { /* Retry on the next poll; keep the cursor unchanged. */ }

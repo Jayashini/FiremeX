@@ -55,6 +55,25 @@ PostgreSQL and Home Assistant, with:
 ./stop.sh
 ```
 
+### Webcam in the Home Assistant dashboard
+
+If FireMeX is embedded in a Home Assistant Webpage dashboard, the default
+iframe allows fullscreen but blocks access to a browser-local webcam. In Home
+Assistant, edit the FireMeX dashboard, choose **Take control**, then edit its
+Webpage card in the code editor and add `allow: fullscreen; camera`:
+
+```yaml
+type: iframe
+url: http://localhost:5173/FiremeX/admin/dashboard
+allow: fullscreen; camera
+```
+
+Save the card and open **Live Feed** in the embedded FireMeX page. This grants
+camera access only to the embedded page; the browser may still ask for camera
+permission. Browser-local webcam detection runs while Live Feed is open on that
+computer. Taking control makes this dedicated Home Assistant dashboard manually
+editable rather than automatically updated.
+
 ## Scripts
 
 ```bash
