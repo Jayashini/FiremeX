@@ -102,6 +102,9 @@ func (s *Store) Save(ctx context.Context, cam models.Camera, f cameras.Frame, r 
 			if err = tx.Create(&row).Error; err != nil {
 				return err
 			}
+			if err = tx.Create(&models.Alert{IncidentID: row.ID, OrganizationID: row.OrganizationID, HazardClass: row.Class, Confidence: row.Confidence, CameraName: row.CameraName, Zone: row.Zone, CreatedAt: row.CreatedAt}).Error; err != nil {
+				return err
+			}
 			inserted = true
 			return nil
 		})

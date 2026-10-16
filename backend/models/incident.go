@@ -133,6 +133,8 @@ type Incident struct {
 	ResolvedByID *uint      `json:"resolved_by_id"`
 	ResolvedBy   *User      `json:"resolved_by,omitempty" gorm:"foreignKey:ResolvedByID"`
 	ResolvedAt   *time.Time `json:"resolved_at"`
+	ResponseUpdatedByID *uint `json:"response_updated_by_id"`
+	ResponseUpdatedAt *time.Time `json:"response_updated_at"`
 
 	// ---------------------------------------------------------------- computed
 
