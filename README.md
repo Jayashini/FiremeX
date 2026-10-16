@@ -13,13 +13,10 @@ PostgreSQL database, and Home Assistant development environment.
 - **Authentication** — Login, plus a registration gateway that supports two paths:
   registering a new **Organization** (which generates a unique org code) or
   requesting **Operator** access to an existing organization (approval-gated).
-- **Dashboard** — Real-time situation overview with a live clock and recent
-  incident summary.
+- **Dashboard** — Current camera, incident, and notification counts with recent activity.
 - **Live Feed** — Grid of monitored cameras; add and manage devices.
-- **Incidents** — Detection history log with search, camera/status filters, and
-  a resolve/blocker workflow (mark incidents Unresolved / In Progress / Resolved
-  with notes).
-- **Alerts** — Notification history filterable by time range and channel.
+- **Incidents** — Fire and smoke detections with evidence, response status, and notes. Everyone in the organization can view an incident and its response history. Only the user who acknowledged its linked notification can start a response, keep it unresolved with a reason, resolve it with a note, or reopen it. Each response action records the user's name and role at the time.
+- **Notifications** — Each detected incident creates one persisted in-app notification. Open the incident from the notification toast or Notifications page to see evidence and acknowledge it in the incident detail. The first user to acknowledge it becomes the response owner; their name and role are saved and visible to the organization. Acknowledgement does not resolve the incident. New detections appear in a top-right notification while the app is open.
 - **Users** — Manage active users and approve/reject pending access requests.
 
 ## Tech stack
@@ -58,6 +55,25 @@ PostgreSQL and Home Assistant, with:
 ./stop.sh
 ```
 
+### Webcam in the Home Assistant dashboard
+
+If FireMeX is embedded in a Home Assistant Webpage dashboard, the default
+iframe allows fullscreen but blocks access to a browser-local webcam. In Home
+Assistant, edit the FireMeX dashboard, choose **Take control**, then edit its
+Webpage card in the code editor and add `allow: fullscreen; camera`:
+
+```yaml
+type: iframe
+url: http://localhost:5173/FiremeX/admin/dashboard
+allow: fullscreen; camera
+```
+
+Save the card and open **Live Feed** in the embedded FireMeX page. This grants
+camera access only to the embedded page; the browser may still ask for camera
+permission. Browser-local webcam detection runs while Live Feed is open on that
+computer. Taking control makes this dedicated Home Assistant dashboard manually
+editable rather than automatically updated.
+
 ## Scripts
 
 ```bash
@@ -78,7 +94,7 @@ src/
   pages/
     auth/               Login, RegisterGateway (+ password screens)
     admin/              Dashboard, Livefeed, AddDevice, Incidents,
-                        Alerts, User, Profile
+                        Notifications, User, Profile
   index.css             Tailwind import + theme tokens and global styles
 public/                 Static assets (logo, images)
 ```

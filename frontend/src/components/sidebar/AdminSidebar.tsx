@@ -46,7 +46,7 @@ const items: SidebarItem[] = [
 		)
 	},
 	{
-		label: 'Alerts',
+		label: 'Notifications',
 		path: '/FiremeX/admin/alerts',
 		key: 'alerts',
 		icon: (active: boolean) => (

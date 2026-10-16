@@ -46,11 +46,22 @@ func main() {
 		&models.User{},
 		&models.Camera{},
 		&models.Incident{},
+		&models.Alert{},
+		&models.IncidentResponseAction{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database: ", err)
 	}
 	log.Println("Database migration completed!")
+	if err := incidents.BackfillAlerts(database.DB); err != nil {
+		log.Fatal("Failed to backfill incident alerts: ", err)
+	}
+	if err := incidents.BackfillAlertActors(database.DB); err != nil {
+		log.Fatal("Failed to backfill alert acknowledgers: ", err)
+	}
+	if err := incidents.BackfillIncidentResponseActions(database.DB); err != nil {
+		log.Fatal("Failed to backfill incident response actors: ", err)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -103,6 +114,9 @@ func main() {
 		protected.GET("/incidents", controllers.GetIncidents)
 		protected.GET("/incidents/:id", controllers.GetIncident)
 		protected.GET("/incidents/:id/snapshot", controllers.IncidentSnapshot)
+		protected.PATCH("/incidents/:id/status", controllers.UpdateIncidentStatus)
+		protected.GET("/alerts", controllers.GetAlerts)
+		protected.PATCH("/alerts/:id/acknowledge", controllers.AcknowledgeAlert)
 		protected.GET("/detection/status", controllers.DetectionStatus)
 		protected.POST("/cameras/:id/browser-frame", controllers.BrowserCameraFrame)
 		protected.GET("/cameras/stream/:entity_id", controllers.StreamCamera)
