@@ -190,8 +190,15 @@ export function AddDevice({ onNavigate }: Props) {
 	const [newCamAi, setNewCamAi] = useState(false)
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [errorMsg, setErrorMsg] = useState('')
+	const [nameTouched, setNameTouched] = useState(false)
+	const [entityTouched, setEntityTouched] = useState(false)
 	const [browserDeviceId, setBrowserDeviceId] = useState('')
 	const showBrowserWebcamPreview = sourceType === 'browser'
+	const isFormValid = Boolean(
+		newCamName.trim() &&
+		newCamZone.trim() &&
+		(sourceType === 'home_assistant' ? selectedEntityId.trim() : browserDeviceId)
+	)
 
 	// Fetch available Home Assistant cameras on mount
 	useEffect(() => {
@@ -252,7 +259,13 @@ export function AddDevice({ onNavigate }: Props) {
 
 	const handleSubmitCamera = async (e: any) => {
 		e.preventDefault()
-		if (sourceType === 'home_assistant' && !selectedEntityId) {
+		setNameTouched(true)
+		setEntityTouched(true)
+		if (!newCamName.trim()) {
+			setErrorMsg('Display name is required.')
+			return
+		}
+		if (sourceType === 'home_assistant' && !selectedEntityId.trim()) {
 			setErrorMsg('Select or enter a Home Assistant camera entity.')
 			return
 		}
@@ -278,7 +291,7 @@ export function AddDevice({ onNavigate }: Props) {
 				body: JSON.stringify({
 					entity_id: entityId,
 					source_type: sourceType,
-					display_name: newCamName || 'New Camera Stream',
+					display_name: newCamName.trim(),
 					zone: newCamZone,
 					ai_enabled: newCamAi
 				})
@@ -384,9 +397,15 @@ export function AddDevice({ onNavigate }: Props) {
 									required
 									placeholder="camera.demo_camera"
 									value={selectedEntityId}
-									onChange={(e: any) => setSelectedEntityId(e.target.value)}
+									onInput={(e: any) => { setEntityTouched(true); setSelectedEntityId(e.currentTarget.value) }}
+									onBlur={() => setEntityTouched(true)}
 									class="w-full bg-[#050B0D] border border-[#8B949E]/20 focus:border-accent text-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors font-mono"
 								/>
+							)}
+							{entityTouched && !selectedEntityId.trim() && (
+								<span role="alert" class="text-[11px] text-red-400 font-mono mt-1">
+									Camera entity is required.
+								</span>
 							)}
 							{haError && (
 								<span class="text-[11px] text-amber-400 font-mono mt-1">
@@ -403,9 +422,15 @@ export function AddDevice({ onNavigate }: Props) {
 								required
 								placeholder="e.g. Perimeter Main Entrance"
 								value={newCamName}
-								onChange={(e: any) => setNewCamName(e.target.value)}
+								onInput={(e: any) => { setNameTouched(true); setNewCamName(e.currentTarget.value) }}
+								onBlur={() => setNameTouched(true)}
 								class="w-full bg-[#050B0D] border border-[#8B949E]/20 focus:border-accent text-slate-200 rounded-xl px-4 py-3 text-sm outline-none transition-colors"
 							/>
+							{nameTouched && !newCamName.trim() && (
+								<span role="alert" class="text-[11px] text-red-400 font-mono mt-1">
+									Display name is required.
+								</span>
+							)}
 						</div>
 
 						{/* Zone Assignment */}
@@ -485,7 +510,7 @@ export function AddDevice({ onNavigate }: Props) {
 						</button>
 						<button
 							type="submit"
-								disabled={isSubmitting || (sourceType === 'browser' && !browserDeviceId)}
+							disabled={isSubmitting || !isFormValid}
 							class="flex items-center gap-2 bg-accent/100 hover:bg-accent/90 text-brand-bg font-mono font-bold text-sm px-6 py-3 rounded-xl transition-all shadow-md shadow-accent/20 disabled:opacity-50"
 						>
 							<span>{isSubmitting ? 'Adding...' : 'Add Camera'}</span>
