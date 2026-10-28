@@ -56,10 +56,43 @@ func demoDB(t *testing.T) *gorm.DB {
 		sql, _ = base.DB()
 		sql.Close()
 	})
-	if err = db.AutoMigrate(&models.Organization{}, &models.User{}, &models.Camera{}, &models.Incident{}); err != nil {
+	if err = db.AutoMigrate(&models.Organization{}, &models.User{}, &models.Camera{}, &models.Incident{}, &models.Alert{}, &models.IncidentResponseAction{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
+}
+
+func TestLegacyResponseActorBackfill(t *testing.T) {
+	db := demoDB(t)
+	org := models.Organization{Name: "Legacy test", Code: "LEGACY", Sector: "test", Email: "legacy@example.invalid"}
+	if err := db.Create(&org).Error; err != nil {
+		t.Fatal(err)
+	}
+	user := models.User{Name: "Original operator", Email: "legacy-operator@example.invalid", Password: "unused", Role: "operator", Status: "active", OrganizationID: &org.ID}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+	cam := models.Camera{EntityID: "camera.legacy", DisplayName: "Legacy camera", OrganizationID: org.ID}
+	if err := db.Create(&cam).Error; err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	row := models.Incident{OrganizationID: org.ID, CameraID: cam.ID, CameraName: cam.DisplayName, Class: models.IncidentClassFire, Status: models.IncidentStatusResolved, ResolveNote: "Handled before upgrade", ResponseUpdatedByID: &user.ID, ResponseUpdatedAt: &now}
+	if err := db.Create(&row).Error; err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := incidents.BackfillIncidentResponseActions(db); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var actions []models.IncidentResponseAction
+	if err := db.Where("incident_id = ?", row.ID).Find(&actions).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(actions) != 1 || actions[0].ActorName != user.Name || actions[0].ActorRole != user.Role || actions[0].Note != row.ResolveNote {
+		t.Fatalf("legacy response snapshot not restored exactly once: %+v", actions)
+	}
 }
 func TestSupervisorPipeline(t *testing.T) {
 	db := demoDB(t)
@@ -116,6 +149,11 @@ func TestSupervisorPipeline(t *testing.T) {
 	if count != 2 {
 		t.Fatalf("expected fire and smoke persisted by background worker, got %d", count)
 	}
+	var alertCount int64
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 2 {
+		t.Fatalf("expected one alert per incident, got %d", alertCount)
+	}
 	var rows []models.Incident
 	db.Order("id").Find(&rows)
 	if rows[0].ReviewStatus != "unconfirmed" || rows[0].ModelVersion != "stub-contract-only" || rows[0].SnapshotFile == "" {
@@ -129,6 +167,10 @@ func TestSupervisorPipeline(t *testing.T) {
 	if n, _, err := restart.Save(context.Background(), cam, f, result, thresholds); err != nil || n != 0 {
 		t.Fatalf("retry duplicated: %d %v", n, err)
 	}
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 2 {
+		t.Fatalf("retry duplicated alerts: %d", alertCount)
+	}
 	now = now.Add(2 * time.Minute)
 	if n, _, err := restart.Save(context.Background(), cam, f, result, thresholds); err != nil || n != 0 {
 		t.Fatalf("idempotency after cooldown failed: %d %v", n, err)
@@ -137,11 +179,36 @@ func TestSupervisorPipeline(t *testing.T) {
 	if n, _, err := restart.Save(context.Background(), cam, f, result, thresholds); err != nil || n != 1 {
 		t.Fatalf("new window failed: %d %v", n, err)
 	}
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 3 {
+		t.Fatalf("new incident did not create an alert: %d", alertCount)
+	}
+	if err := incidents.BackfillAlerts(db); err != nil {
+		t.Fatal(err)
+	}
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 3 {
+		t.Fatalf("backfill duplicated alerts: %d", alertCount)
+	}
+	// Simulate an incident created before notifications existed.
+	if err := db.Where("incident_id = ?", rows[0].ID).Delete(&models.Alert{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := incidents.BackfillAlerts(db); err != nil {
+		t.Fatal(err)
+	}
+	db.Model(&models.Alert{}).Count(&alertCount)
+	if alertCount != 3 {
+		t.Fatalf("backfill failed to restore a missing alert: %d", alertCount)
+	}
 	router := gin.New()
 	api := router.Group("/api", middleware.RequireAuth)
 	api.GET("/incidents", controllers.GetIncidents)
 	api.GET("/incidents/:id", controllers.GetIncident)
 	api.GET("/incidents/:id/snapshot", controllers.IncidentSnapshot)
+	api.PATCH("/incidents/:id/status", controllers.UpdateIncidentStatus)
+	api.GET("/alerts", controllers.GetAlerts)
+	api.PATCH("/alerts/:id/acknowledge", controllers.AcknowledgeAlert)
 	api.GET("/detection/status", controllers.DetectionStatus)
 	api.PATCH("/cameras/:id/detection", middleware.RequireAdmin, controllers.ToggleDetection)
 	request := func(user models.User, method, path, body string, cookie bool) *httptest.ResponseRecorder {
@@ -182,6 +249,176 @@ func TestSupervisorPipeline(t *testing.T) {
 		if rr.Code != check.code {
 			t.Errorf("%s %s got %d want %d: %s", check.method, check.path, rr.Code, check.code, rr.Body.String())
 		}
+	}
+	var firstAlert models.Alert
+	db.Where("incident_id = ?", rows[0].ID).First(&firstAlert)
+	alertPath := fmt.Sprintf("/api/alerts/%d/acknowledge", firstAlert.ID)
+	statusPath := path + "/status"
+	responseChecks := []struct {
+		user               models.User
+		method, path, body string
+		code               int
+	}{
+		{operator, "PATCH", statusPath, `{"status":"resolved"}`, 400},
+		{operator, "PATCH", statusPath, `{"status":"invalid"}`, 400},
+		{outsider, "PATCH", statusPath, `{"status":"in_progress"}`, 404},
+		{outsider, "PATCH", alertPath, "", 404},
+		{admin, "GET", "/api/alerts?acknowledged=maybe", "", 400},
+		{operator, "PATCH", statusPath, `{"status":"in_progress"}`, 403},
+		{operator, "PATCH", alertPath, "", 200},
+		{admin, "PATCH", alertPath, "", 200},
+		{admin, "PATCH", statusPath, `{"status":"in_progress"}`, 403},
+		{operator, "PATCH", statusPath, `{"status":"in_progress"}`, 200},
+		{operator, "PATCH", statusPath, `{"status":"unresolved","blocker_reason":"Waiting for maintenance"}`, 200},
+		{operator, "PATCH", statusPath, `{"status":"in_progress"}`, 200},
+		{operator, "PATCH", statusPath, `{"status":"resolved","note":"Area checked"}`, 200},
+	}
+	for _, check := range responseChecks {
+		rr := request(check.user, check.method, check.path, check.body, false)
+		if rr.Code != check.code {
+			t.Errorf("%s %s got %d want %d: %s", check.method, check.path, rr.Code, check.code, rr.Body.String())
+		}
+	}
+	var updated models.Incident
+	db.First(&updated, rows[0].ID)
+	if updated.Status != models.IncidentStatusResolved || updated.ResolveNote != "Area checked" || updated.ResolvedByID == nil || *updated.ResolvedByID != operator.ID || updated.ResponseUpdatedAt == nil {
+		t.Fatal("response audit not saved")
+	}
+	if updated.BlockerReason != "" || updated.SnapshotFile == "" {
+		t.Fatal("response update altered evidence or kept an old blocker")
+	}
+	db.First(&firstAlert, firstAlert.ID)
+	if firstAlert.AcknowledgedAt == nil || firstAlert.AcknowledgedByID == nil || *firstAlert.AcknowledgedByID != operator.ID || firstAlert.AcknowledgedByName != operator.Name || firstAlert.AcknowledgedByRole != operator.Role {
+		t.Fatal("acknowledgement not saved separately")
+	}
+	var actions []models.IncidentResponseAction
+	if err := db.Where("incident_id = ?", rows[0].ID).Order("id").Find(&actions).Error; err != nil || len(actions) != 4 {
+		t.Fatalf("expected four response history entries: %v, %d", err, len(actions))
+	}
+	for _, action := range actions {
+		if action.ActorID != operator.ID || action.ActorName != operator.Name || action.ActorRole != operator.Role {
+			t.Fatal("response actor snapshot incorrect")
+		}
+	}
+	if rr := request(admin, "GET", path, "", false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"actor_name":"Operator"`) || !strings.Contains(rr.Body.String(), `"can_respond":false`) || !strings.Contains(rr.Body.String(), `"status":"resolved"`) {
+		t.Fatal("admins could not see response history or ownership:", rr.Body.String())
+	}
+	if rr := request(admin, "GET", path+"/snapshot", "", false); rr.Code != 200 {
+		t.Fatal("other user could not view evidence after acknowledgement:", rr.Body.String())
+	}
+	if rr := request(operator, "GET", path, "", false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"can_respond":true`) {
+		t.Fatal("acknowledger could not manage response:", rr.Body.String())
+	}
+	if rr := request(operator, "GET", path, "", false); rr.Code != 200 || !strings.Contains(rr.Body.String(), fmt.Sprintf(`"alert_id":%d`, firstAlert.ID)) {
+		t.Fatal("incident detail did not identify the linked notification:", rr.Body.String())
+	}
+	if rr := request(admin, "PATCH", statusPath, `{"status":"unresolved"}`, false); rr.Code != 403 {
+		t.Fatal("admin bypassed response ownership:", rr.Body.String())
+	}
+	if rr := request(operator, "PATCH", statusPath, `{"status":"unresolved"}`, false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"resolved_at":null`) {
+		t.Fatal("reopen response failed:", rr.Body.String())
+	}
+	var secondAlert models.Alert
+	if err := db.Where("incident_id = ?", rows[1].ID).First(&secondAlert).Error; err != nil {
+		t.Fatal(err)
+	}
+	secondStatusPath := fmt.Sprintf("/api/incidents/%d/status", rows[1].ID)
+	if rr := request(admin, "PATCH", fmt.Sprintf("/api/alerts/%d/acknowledge", secondAlert.ID), "", false); rr.Code != 200 {
+		t.Fatal("admin acknowledgement failed:", rr.Body.String())
+	}
+	if rr := request(admin, "PATCH", secondStatusPath, `{"status":"resolved","note":"Area secured"}`, false); rr.Code != 200 {
+		t.Fatal("admin response failed:", rr.Body.String())
+	}
+	if rr := request(operator, "PATCH", secondStatusPath, `{"status":"unresolved"}`, false); rr.Code != 403 {
+		t.Fatal("operator changed admin-owned response:", rr.Body.String())
+	}
+	var thirdIncident models.Incident
+	if err := db.Order("id DESC").First(&thirdIncident).Error; err != nil {
+		t.Fatal(err)
+	}
+	var thirdAlert models.Alert
+	if err := db.Where("incident_id = ?", thirdIncident.ID).First(&thirdAlert).Error; err != nil {
+		t.Fatal(err)
+	}
+	thirdAlertPath := fmt.Sprintf("/api/alerts/%d/acknowledge", thirdAlert.ID)
+	start := make(chan struct{})
+	results := make(chan *httptest.ResponseRecorder, 2)
+	for _, contender := range []models.User{admin, operator} {
+		go func(user models.User) { <-start; results <- request(user, "PATCH", thirdAlertPath, "", false) }(contender)
+	}
+	close(start)
+	for range 2 {
+		if rr := <-results; rr.Code != 200 {
+			t.Fatal("concurrent acknowledgement failed:", rr.Body.String())
+		}
+	}
+	if err := db.First(&thirdAlert, thirdAlert.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if thirdAlert.AcknowledgedByID == nil || thirdAlert.AcknowledgedAt == nil {
+		t.Fatal("concurrent acknowledgement left notification unclaimed")
+	}
+	winner := admin
+	if *thirdAlert.AcknowledgedByID == operator.ID {
+		winner = operator
+	}
+	if *thirdAlert.AcknowledgedByID != winner.ID || thirdAlert.AcknowledgedByName != winner.Name || thirdAlert.AcknowledgedByRole != winner.Role {
+		t.Fatal("concurrent acknowledgement actor mismatch")
+	}
+	for _, viewer := range []models.User{admin, operator} {
+		rr := request(viewer, "GET", fmt.Sprintf("/api/incidents/%d", thirdIncident.ID), "", false)
+		if rr.Code != 200 || !strings.Contains(rr.Body.String(), fmt.Sprintf(`"can_respond":%t`, viewer.ID == winner.ID)) || !strings.Contains(rr.Body.String(), `"acknowledged_by_name":"`+winner.Name+`"`) {
+			t.Fatal("concurrent acknowledgement not visible consistently:", rr.Body.String())
+		}
+	}
+	loser := operator
+	if winner.ID == operator.ID {
+		loser = admin
+	}
+	thirdStatusPath := fmt.Sprintf("/api/incidents/%d/status", thirdIncident.ID)
+	if rr := request(loser, "PATCH", thirdStatusPath, `{"status":"in_progress"}`, false); rr.Code != 403 {
+		t.Fatal("loser of acknowledgement race changed response:", rr.Body.String())
+	}
+	if rr := request(winner, "PATCH", thirdStatusPath, `{"status":"in_progress"}`, false); rr.Code != 200 {
+		t.Fatal("winner of acknowledgement race could not respond:", rr.Body.String())
+	}
+	if err := db.Model(&firstAlert).Updates(map[string]any{"acknowledged_by_name": "", "acknowledged_by_role": ""}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := incidents.BackfillAlertActors(db); err != nil {
+		t.Fatal(err)
+	}
+	firstAlertID := firstAlert.ID
+	firstAlert = models.Alert{}
+	if err := db.First(&firstAlert, firstAlertID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if firstAlert.AcknowledgedByName != operator.Name || firstAlert.AcknowledgedByRole != operator.Role {
+		t.Fatal("existing acknowledgement actor was not backfilled")
+	}
+	if err := db.Model(&operator).Update("name", "Renamed operator").Error; err != nil {
+		t.Fatal(err)
+	}
+	if rr := request(admin, "GET", path, "", false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"actor_name":"Operator"`) || !strings.Contains(rr.Body.String(), `"acknowledged_by_name":"Operator"`) {
+		t.Fatal("actor snapshots changed with user profile:", rr.Body.String())
+	}
+	updated = models.Incident{}
+	db.First(&updated, rows[0].ID)
+	if updated.Status != models.IncidentStatusUnresolved || updated.ResolvedAt != nil {
+		t.Fatal("reopen was not persisted")
+	}
+	db.First(&firstAlert, firstAlert.ID)
+	if firstAlert.AcknowledgedAt == nil {
+		t.Fatal("reopening incident changed notification acknowledgement")
+	}
+	if rr := request(admin, "GET", "/api/alerts?after_id=0&page_size=1", "", false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"filtered_total":3`) {
+		t.Fatal("alert cursor failed:", rr.Body.String())
+	}
+	if rr := request(outsider, "GET", "/api/alerts", "", false); rr.Code != 200 || !strings.Contains(rr.Body.String(), `"alerts":[]`) {
+		t.Fatal("other organization saw alerts")
+	}
+	if rr := request(models.User{}, "GET", "/api/alerts", "", false); rr.Code != 401 {
+		t.Fatal("anonymous alerts access")
 	}
 	rr := request(admin, "GET", "/api/incidents?page_size=1", "", false)
 	var listing struct {

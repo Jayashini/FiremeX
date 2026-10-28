@@ -18,12 +18,18 @@ func RegisterOrganization(c *gin.Context) {
 		Sector    string `json:"sector" binding:"required"`
 		Email     string `json:"email" binding:"required,email"`
 		Phone     string `json:"phone"`
+		Country   string `json:"country"`
 		AdminName string `json:"admin_name" binding:"required"`
 		Password  string `json:"password" binding:"required,min=6"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
+		return
+	}
+
+	if input.Country != "" && !isValidPhoneForCountry(input.Phone, input.Country) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Contact number format mismatch"})
 		return
 	}
 
@@ -38,11 +44,12 @@ func RegisterOrganization(c *gin.Context) {
 
 	// 2. Create the organization
 	org := models.Organization{
-		Name:   input.OrgName,
-		Code:   orgCode,
-		Sector: input.Sector,
-		Email:  input.Email,
-		Phone:  input.Phone,
+		Name:    input.OrgName,
+		Code:    orgCode,
+		Sector:  input.Sector,
+		Email:   input.Email,
+		Phone:   input.Phone,
+		Country: input.Country,
 	}
 
 	if err := database.DB.Create(&org).Error; err != nil {
@@ -78,10 +85,11 @@ func RegisterOrganization(c *gin.Context) {
 		"message":  "Organization registered successfully!",
 		"org_code": orgCode,
 		"org": gin.H{
-			"id":     org.ID,
-			"name":   org.Name,
-			"code":   org.Code,
-			"sector": org.Sector,
+			"id":      org.ID,
+			"name":    org.Name,
+			"code":    org.Code,
+			"sector":  org.Sector,
+			"country": org.Country,
 		},
 	})
 }
@@ -155,11 +163,12 @@ func GetOrganization(c *gin.Context) {
 	}
 
 	response := organizationResponse{
-		ID:     org.ID,
-		Name:   org.Name,
-		Sector: org.Sector,
-		Email:  org.Email,
-		Phone:  org.Phone,
+		ID:      org.ID,
+		Name:    org.Name,
+		Sector:  org.Sector,
+		Email:   org.Email,
+		Phone:   org.Phone,
+		Country: org.Country,
 	}
 	if user.Role == "admin" {
 		response.Code = org.Code
@@ -180,10 +189,11 @@ func UpdateOrganization(c *gin.Context) {
 	}
 
 	var input struct {
-		Name   string `json:"name" binding:"required"`
-		Sector string `json:"sector" binding:"required"`
-		Email  string `json:"email" binding:"required,email"`
-		Phone  string `json:"phone"`
+		Name    string `json:"name" binding:"required"`
+		Sector  string `json:"sector" binding:"required"`
+		Email   string `json:"email" binding:"required,email"`
+		Phone   string `json:"phone"`
+		Country string `json:"country"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
@@ -200,6 +210,7 @@ func UpdateOrganization(c *gin.Context) {
 	org.Sector = input.Sector
 	org.Email = input.Email
 	org.Phone = input.Phone
+	org.Country = input.Country
 
 	if err := database.DB.Save(&org).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update organization"})
@@ -209,12 +220,13 @@ func UpdateOrganization(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Organization updated",
 		"organization": organizationResponse{
-			ID:     org.ID,
-			Name:   org.Name,
-			Sector: org.Sector,
-			Email:  org.Email,
-			Phone:  org.Phone,
-			Code:   org.Code,
+			ID:      org.ID,
+			Name:    org.Name,
+			Sector:  org.Sector,
+			Email:   org.Email,
+			Phone:   org.Phone,
+			Country: org.Country,
+			Code:    org.Code,
 		},
 	})
 }

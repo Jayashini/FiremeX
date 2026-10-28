@@ -12,6 +12,7 @@ export type Organization = {
 	sector: string
 	email: string
 	phone: string
+	country?: string
 	/** Operator join code. The API only sends this to administrators. */
 	code?: string
 }

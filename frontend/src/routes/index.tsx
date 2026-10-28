@@ -7,6 +7,7 @@ import { RegisterGateway } from '../pages/auth/RegisterGateway'
 import { Dashboard } from '../pages/admin/Dashboard'
 import { Incidents } from '../pages/admin/Incidents'
 import { Alerts } from '../pages/admin/Alerts'
+import { AlertToastHost } from '../components/incidents/AlertToastHost'
 import { Livefeed } from '../pages/admin/Livefeed'
 import { AddDevice } from '../pages/admin/AddDevice'
 import { User } from '../pages/admin/User'
@@ -17,6 +18,7 @@ import { clearSession, fetchMe, getUser, homePathFor, isLoggedIn } from '../sess
 
 export function AppRoutes() {
 	const [path, setPath] = useState(() => normalizePath(window.location.pathname))
+	const [openIncidentId, setOpenIncidentId] = useState<number | null>(() => incidentFromURL())
 
 	// Start from whatever was stored, so a returning user sees their pages
 	// immediately instead of a loading flash.
@@ -24,7 +26,7 @@ export function AppRoutes() {
 	const [checking, setChecking] = useState(() => isLoggedIn() && !getUser())
 
 	useEffect(() => {
-		const handlePopState = () => setPath(normalizePath(window.location.pathname))
+		const handlePopState = () => { setPath(normalizePath(window.location.pathname)); setOpenIncidentId(incidentFromURL()) }
 		window.addEventListener('popstate', handlePopState)
 		return () => window.removeEventListener('popstate', handlePopState)
 	}, [])
@@ -51,11 +53,23 @@ export function AppRoutes() {
 
 	const navigate = (nextPath: string) => {
 		const normalized = normalizePath(nextPath)
-		if (normalized !== path) {
+		setOpenIncidentId(null)
+		if (normalized !== path || window.location.search) {
 			window.history.pushState({}, '', normalized)
 			setPath(normalized)
 		}
 	}
+	const viewIncident = (id: number) => {
+		const next = `/FiremeX/${user?.role === 'operator' ? 'operator' : 'admin'}/incidents`
+		window.history.pushState({}, '', `${next}?incident=${id}`)
+		setOpenIncidentId(id)
+		setPath(next)
+	}
+	const closeIncident = () => {
+		setOpenIncidentId(null)
+		if (window.location.search) window.history.replaceState({}, '', window.location.pathname)
+	}
+	const authenticated = (content: preact.ComponentChild) => <>{content}<AlertToastHost onViewIncident={viewIncident} /></>
 
 	const onSignedIn = (signedIn: SessionUser) => {
 		setUser(signedIn)
@@ -119,31 +133,31 @@ export function AppRoutes() {
 
 	// ---------------------------------------------------------------- admin
 	if (path === '/FiremeX/admin/dashboard') {
-		return (
+		return authenticated(
 			<AdminLayout activePage="dashboard" onNavigate={navigate} user={user}>
-				<Dashboard onNavigate={navigate} />
+				<Dashboard onNavigate={navigate} onViewIncident={viewIncident} />
 			</AdminLayout>
 		)
 	}
 
 	if (path === '/FiremeX/admin/incidents') {
-		return (
+		return authenticated(
 			<AdminLayout activePage="incidents" onNavigate={navigate} user={user}>
-				<Incidents />
+				<Incidents openIncidentId={openIncidentId} onIncidentClosed={closeIncident} />
 			</AdminLayout>
 		)
 	}
 
 	if (path === '/FiremeX/admin/alerts') {
-		return (
+		return authenticated(
 			<AdminLayout activePage="alerts" onNavigate={navigate} user={user}>
-				<Alerts />
+				<Alerts onViewIncident={viewIncident} />
 			</AdminLayout>
 		)
 	}
 
 	if (path === '/FiremeX/admin/livefeed') {
-		return (
+		return authenticated(
 			<AdminLayout activePage="livefeed" onNavigate={navigate} user={user}>
 				<Livefeed onNavigate={navigate} />
 			</AdminLayout>
@@ -151,7 +165,7 @@ export function AppRoutes() {
 	}
 
 	if (path === '/FiremeX/admin/livefeed/add-device') {
-		return (
+		return authenticated(
 			<AdminLayout activePage="livefeed" onNavigate={navigate} user={user}>
 				<AddDevice onNavigate={navigate} />
 			</AdminLayout>
@@ -159,7 +173,7 @@ export function AppRoutes() {
 	}
 
 	if (path === '/FiremeX/admin/users') {
-		return (
+		return authenticated(
 			<AdminLayout activePage="users" onNavigate={navigate} user={user}>
 				<User />
 			</AdminLayout>
@@ -167,7 +181,7 @@ export function AppRoutes() {
 	}
 
 	if (path === '/FiremeX/admin/profile') {
-		return (
+		return authenticated(
 			<AdminLayout activePage="profile" onNavigate={navigate} user={user}>
 				<Profile user={user} onUserUpdated={setUser} />
 			</AdminLayout>
@@ -175,7 +189,7 @@ export function AppRoutes() {
 	}
 
 	if (path === '/FiremeX/admin/settings') {
-		return (
+		return authenticated(
 			<AdminLayout activePage="settings" onNavigate={navigate} user={user}>
 				<Settings user={user} onNavigate={navigate} onUserUpdated={setUser} />
 			</AdminLayout>
@@ -184,7 +198,7 @@ export function AppRoutes() {
 
 	// ------------------------------------------------------------- operator
 	if (path === '/FiremeX/operator/livefeed') {
-		return (
+		return authenticated(
 			<OperatorLayout activePage="livefeed" onNavigate={navigate} user={user}>
 				<Livefeed onNavigate={navigate} readOnly />
 			</OperatorLayout>
@@ -192,15 +206,22 @@ export function AppRoutes() {
 	}
 
 	if (path === '/FiremeX/operator/incidents') {
-		return (
+		return authenticated(
 			<OperatorLayout activePage="incidents" onNavigate={navigate} user={user}>
-				<Incidents />
+				<Incidents openIncidentId={openIncidentId} onIncidentClosed={closeIncident} />
+			</OperatorLayout>
+		)
+	}
+	if (path === '/FiremeX/operator/alerts') {
+		return authenticated(
+			<OperatorLayout activePage="alerts" onNavigate={navigate} user={user}>
+				<Alerts onViewIncident={viewIncident} />
 			</OperatorLayout>
 		)
 	}
 
 	if (path === '/FiremeX/operator/profile') {
-		return (
+		return authenticated(
 			<OperatorLayout activePage="profile" onNavigate={navigate} user={user}>
 				<Profile user={user} onUserUpdated={setUser} />
 			</OperatorLayout>
@@ -218,4 +239,9 @@ export function AppRoutes() {
 function normalizePath(pathname: string) {
 	if (!pathname || pathname === '/') return '/FiremeX/login'
 	return pathname.replace(/\/$/, '') || '/FiremeX/login'
+}
+
+function incidentFromURL(): number | null {
+	const value = Number(new URLSearchParams(window.location.search).get('incident'))
+	return Number.isSafeInteger(value) && value > 0 ? value : null
 }

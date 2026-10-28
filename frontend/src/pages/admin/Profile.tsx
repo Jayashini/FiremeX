@@ -128,6 +128,7 @@ export function Profile({ user, onUserUpdated }: Props) {
 					<Field label="Sector" value={user.organization?.sector} />
 					<Field label="Contact email" value={user.organization?.email} />
 					<Field label="Phone" value={user.organization?.phone} />
+					<Field label="Country" value={user.organization?.country} />
 				</Card>
 
 				{/* Account */}
