@@ -1,19 +1,20 @@
 # FiremeX fire & smoke detection model
 
-The trained YOLOv8 model from the FiremeX project, packaged so you can use it
-without setting up any training yourself.
+The trained FiremeX fire and smoke model, packaged so you can use it without
+setting up any training yourself.
 
 ```
-fire_model.pt          the weights (6.0 MB)
+fire_model.pt          the weights (5.2 MB) — model-v4, YOLO26n
 detect_service.py      HTTP service — call it from your Go backend
 try_model.py           run it on one image or video, see what it does
 requirements.txt       what to pip install
-PR_curve.png           precision/recall curves from training
-confusion_matrix.png   normalised confusion matrix
 ```
 
 sha256 of `fire_model.pt`:
-`2ab009042ba04827ee1cd1ccb0648832577677334c5fe4927e7c7950f7406c89`
+`c29a62d0a76735165da5bc44b4a2c1737c33eb8191898aa8f533b5dbdf321396`
+
+The same file (and an ONNX export) is published as GitHub Release
+[model-v4](https://github.com/malika1234m/Firemax/releases/tag/model-v4).
 
 ---
 
@@ -21,22 +22,14 @@ sha256 of `fire_model.pt`:
 
 | | |
 |---|---|
-| Architecture | YOLOv8n (Ultralytics), detection task |
-| Classes | `0: fire`, `1: smoke` — **only these two** |
-| Input | any resolution; Ultralytics letterboxes internally |
-| Size | 6.0 MB, runs on CPU |
-| Trained on | [Simuletic CCTV-Smoke-Fire-Emergency-Detection-Dataset](https://huggingface.co/datasets/Simuletic/CCTV-Smoke-Fire-Emergency-Detection-Dataset) (Hugging Face) |
+| Architecture | YOLO26n (Ultralytics 8.4), detection task — no NMS step |
+| Classes | `0: smoke`, `1: fire` — **only these two** (always use the names, not the numbers) |
+| Input | any resolution; Ultralytics letterboxes internally (trained at 640) |
+| Size | 5.2 MB, about 35 ms per 1080p frame on an Apple M1 CPU |
+| Trained on | all of [D-Fire](https://github.com/gaiasd/DFireDataset) (real fire/smoke photos, ~45% with neither), the [Home Fire Dataset](https://github.com/PengBo0/Home-fire-dataset) (indoor rooms, CC BY-NC 4.0) and our own EZVIZ CCTV recordings |
+| Training | Google Colab T4, 60 epochs from YOLO26n COCO weights |
 
-Trained on **CCTV-style footage** specifically, rather than the dramatic
-close-up fire photos most public fire datasets use. That matters — a model
-trained on close-ups tends to do poorly on a wide-angle camera looking down a
-warehouse aisle, which is the actual use case.
-
-The dataset was split **by scene group, not by frame.** The source has 48 scenes
-of ~5 near-identical frames each; splitting per-image would put nearly identical
-frames in both train and validation, and the reported accuracy would be
-inflated by memorisation. If you retrain, keep that in mind — it's the easiest
-way to accidentally report a great number that means nothing.
+Needs **Ultralytics 8.4 or newer** — 8.2 cannot load YOLO26.
 
 ---
 
@@ -92,28 +85,28 @@ Configure with env vars: `MODEL_PATH`, `CONFIDENCE_THRESHOLD`, `PORT`.
 
 ## How well it actually works
 
-Being straight with you, because you'll build on top of this:
+Scores on held-out test pictures the model never trained on, against the
+previous model (model-v3, YOLOv8n):
 
-| Metric (best epoch, 17 of 27) | |
-|---|---|
-| Precision | 0.53 |
-| Recall | 0.35 |
-| mAP@50 | 0.27 |
-| mAP@50-95 | 0.12 |
+| Test set | mAP@50 v3 | mAP@50 **v4** | fire recall v4 | smoke recall v4 |
+|---|---|---|---|---|
+| Home Fire test (indoor) | 0.858 | **0.893** | 0.807 | 0.814 |
+| Our camera test | 0.786 | **0.867** | 0.830 | — (no smoke in it) |
+| D-Fire test | 0.743 | **0.773** | 0.655 | 0.795 |
+| **Average** | 0.796 | **0.844** | | |
 
-**This is a v1 model, and it is not production-accurate.** Specifically:
+On our own camera videos (threshold 0.50, CPU):
 
-- **`fire` is the weak class** — recall around 0.22. Smoke is noticeably better.
-  Counter-intuitive, but smoke is large and textured while flame is often small,
-  bright and blown-out on CCTV.
-- **False positives on orange/yellow vertical objects.** In our own testing it
-  boxed yellow bollards as `fire 55%`. Anything amber and upright is a candidate.
-- The default threshold of **0.50 is on the low side** given that. Try 0.60 if
-  you're seeing too much noise — you'll lose some true positives, so decide
-  deliberately which error you'd rather have.
+- burning paper: fire caught in **94%** of checked frames (v3: 85%)
+- a lighter held 1 m away: **no false alarms**
+- smoke blown at the lens: detected (0.56)
 
-Look at `PR_curve.png` and `confusion_matrix.png` before you trust any number
-here.
+Known weaknesses:
+
+- **Thin or distant smoke** is still the weak spot — a cigarette puff across the
+  room scores below 0.50.
+- `fire` on D-Fire's outdoor/far shots has the lowest recall (0.66).
+- Tested on one room and one camera; other scenes need their own check.
 
 ### The design consequence
 
@@ -131,23 +124,9 @@ alert gets missed.
 
 ---
 
-## If you want to improve it
-
-The honest paths, roughly in order of payoff:
-
-1. **More real CCTV data.** 48 scenes is small. This is by far the biggest lever.
-2. **Train longer with sensible early stopping.** Ours stopped at 27 epochs;
-   `patience=10` triggered on noise rather than a real plateau.
-3. **A bigger backbone.** YOLOv8n is the smallest. `yolov8s` costs more CPU and
-   would likely help, if your target hardware can afford it.
-
-Keep the scene-group split if you rebuild the dataset.
-
----
-
 ## Notes
 
-- `fire_model.pt` is a 6 MB binary. **Don't commit it to git** — it'll bloat the
+- `fire_model.pt` is a 5 MB binary. **Don't commit it to git** — it'll bloat the
   repo permanently, and every clone pays for it. Attach it to a GitHub Release
   and download it at build/run time, or keep this folder outside the repo.
 - Ultralytics is AGPL-3.0. That has licensing implications if you ever
