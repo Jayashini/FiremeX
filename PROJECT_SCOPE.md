@@ -112,7 +112,7 @@ triggered directly by the model.
 
 These are real limits the team should keep in view.
 
-- **Model accuracy.** The current model is v1: precision 0.53, recall 0.35, and `fire` recall around 0.22. It is usable for demonstration and development, not for a safety guarantee. See `firemex-model/README.md`.
+- **Model accuracy.** The current model is v4 (YOLO26n): mAP@50 0.84 on average over three held-out test sets, fire recall 0.66–0.83. Thin or distant smoke is still the weak spot. It is good for demonstration and development, not a safety guarantee. See `firemex-model/README.md`.
 - **Licensing.** Ultralytics YOLO is AGPL-3.0, and Ultralytics states that trained models fall under it too. That is fine for coursework, but a commercial FiremeX would need an Ultralytics Enterprise Licence or a different runtime. This must be settled before the product is sold.
 - **Add-on packaging.** The development environment runs the `homeassistant/home-assistant` Docker image, which does **not** support add-ons. Shipping FiremeX as a true Home Assistant add-on requires Home Assistant OS or Supervised; otherwise it ships as a docker-compose bundle and the wording "plugin" should be softened.
 

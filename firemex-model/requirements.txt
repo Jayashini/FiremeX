@@ -13,7 +13,8 @@ torchvision==0.20.1     ; platform_machine != "x86_64"
 
 numpy==1.26.4
 
-ultralytics==8.2.0
+# 8.4 or newer is needed to load YOLO26 (fire_model.pt is YOLO26n).
+ultralytics==8.4.176
 opencv-python-headless==4.9.0.80
 pillow==10.4.0
 
