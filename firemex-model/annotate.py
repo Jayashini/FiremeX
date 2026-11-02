@@ -21,6 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 BOX_COLOURS = {
     "fire": (220, 38, 38),
     "smoke": (245, 158, 11),
+    "small_flame": (14, 165, 233),
 }
 UNKNOWN_COLOUR = (220, 38, 38)
 
