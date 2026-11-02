@@ -4,17 +4,17 @@ The trained FiremeX fire and smoke model, packaged so you can use it without
 setting up any training yourself.
 
 ```
-fire_model.pt          the weights (5.2 MB) — model-v4, YOLO26n
+fire_model.pt          the weights (5.2 MB) — model-v5, YOLO26n
 detect_service.py      HTTP service — call it from your Go backend
 try_model.py           run it on one image or video, see what it does
 requirements.txt       what to pip install
 ```
 
 sha256 of `fire_model.pt`:
-`c29a62d0a76735165da5bc44b4a2c1737c33eb8191898aa8f533b5dbdf321396`
+`359294a206b666557a726a8390163b555e1e04edaea7b4615d1145955c5a05ab`
 
 The same file (and an ONNX export) is published as GitHub Release
-[model-v4](https://github.com/malika1234m/Firemax/releases/tag/model-v4).
+[model-v5](https://github.com/malika1234m/Firemax/releases/tag/model-v5).
 
 ---
 
@@ -23,13 +23,17 @@ The same file (and an ONNX export) is published as GitHub Release
 | | |
 |---|---|
 | Architecture | YOLO26n (Ultralytics 8.4), detection task — no NMS step |
-| Classes | `0: smoke`, `1: fire` — **only these two** (always use the names, not the numbers) |
+| Classes | `0: smoke`, `1: fire`, `2: small_flame` (always use the names, not the numbers) |
 | Input | any resolution; Ultralytics letterboxes internally (trained at 640) |
 | Size | 5.2 MB, about 35 ms per 1080p frame on an Apple M1 CPU |
 | Trained on | all of [D-Fire](https://github.com/gaiasd/DFireDataset) (real fire/smoke photos, ~45% with neither), the [Home Fire Dataset](https://github.com/PengBo0/Home-fire-dataset) (indoor rooms, CC BY-NC 4.0) and our own EZVIZ CCTV recordings |
-| Training | Google Colab T4, 60 epochs from YOLO26n COCO weights |
+| Training | Google Colab T4: model-v4 = 60 epochs from YOLO26n COCO weights; model-v5 = v4 fine-tuned 30 more epochs with lighter-flame clips added |
 
 Needs **Ultralytics 8.4 or newer** — 8.2 cannot load YOLO26.
+
+**`small_flame` is not a fire.** It is a lighter or candle flame. The service
+never counts it as a hazard: it is returned in a separate `small_flames` list,
+so `hazard` and `detections` still mean fire or smoke only.
 
 ---
 
@@ -69,6 +73,15 @@ POST http://localhost:8100/detect
 }
 ```
 
+A lighter or candle in view adds a `small_flames` list beside the detections
+(same fields). It never makes `hazard` true, and the Go backend ignores it:
+
+```json
+{"hazard": false, "detections": [],
+ "small_flames": [{"label": "small_flame", "confidence": 0.88,
+                   "box": {"x1": 880, "y1": 589, "x2": 922, "y2": 628}}]}
+```
+
 `GET /health` returns whether the model loaded, plus its classes and threshold —
 useful as a startup check.
 
@@ -85,26 +98,31 @@ Configure with env vars: `MODEL_PATH`, `CONFIDENCE_THRESHOLD`, `PORT`.
 
 ## How well it actually works
 
-Scores on held-out test pictures the model never trained on, against the
-previous model (model-v3, YOLOv8n):
+model-v4 scores on held-out test pictures the model never trained on, against
+the model before it (model-v3, YOLOv8n):
 
-| Test set | mAP@50 v3 | mAP@50 **v4** | fire recall v4 | smoke recall v4 |
+| Test set | mAP@50 v3 | mAP@50 v4 | fire recall v4 | smoke recall v4 |
 |---|---|---|---|---|
 | Home Fire test (indoor) | 0.858 | **0.893** | 0.807 | 0.814 |
 | Our camera test | 0.786 | **0.867** | 0.830 | — (no smoke in it) |
 | D-Fire test | 0.743 | **0.773** | 0.655 | 0.795 |
 | **Average** | 0.796 | **0.844** | | |
 
-On our own camera videos (threshold 0.50, CPU):
+model-v5 (the file in this folder) is v4 plus the `small_flame` class. On our
+own camera videos (threshold 0.50, CPU), v4 → v5:
 
-- burning paper: fire caught in **94%** of checked frames (v3: 85%)
-- a lighter held 1 m away: **no false alarms**
-- smoke blown at the lens: detected (0.56)
+| Video | model-v4 | **model-v5** |
+|---|---|---|
+| Lighter at mid and 1 m (held out) | not seen | **small_flame in every frame the lighter is lit** (best 0.92), never called fire |
+| Burning paper (held out) | fire in 93% of frames | fire in 87% of frames |
+| Demo fire video | fire 50% / smoke 50% of frames | fire 49% / smoke 45% |
+| Cigarette smoke blown at the lens | smoke 0.56 — alerts | **smoke 0.17 — no alert** |
 
 Known weaknesses:
 
-- **Thin or distant smoke** is still the weak spot — a cigarette puff across the
-  room scores below 0.50.
+- **Smoke is v5's weak spot.** Close-up cigarette smoke dropped below the
+  threshold, and thin or distant smoke was already hard for v4. Our camera
+  dataset has no smoke clips yet; adding some is the next step.
 - `fire` on D-Fire's outdoor/far shots has the lowest recall (0.66).
 - Tested on one room and one camera; other scenes need their own check.
 
