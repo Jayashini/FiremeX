@@ -1,3 +1,4 @@
+import { INGRESS_PREFIX } from '../api'
 import { useEffect, useState } from 'preact/hooks'
 import { AuthLayout } from '../layouts/AuthLayout'
 import { AdminLayout } from '../layouts/AdminLayout'
@@ -17,7 +18,7 @@ import type { SessionUser } from '../session'
 import { clearSession, fetchMe, getUser, homePathFor, isLoggedIn } from '../session'
 
 export function AppRoutes() {
-	const [path, setPath] = useState(() => normalizePath(window.location.pathname))
+	const [path, setPath] = useState(() => normalizePath(window.location.pathname.slice(INGRESS_PREFIX.length)))
 	const [openIncidentId, setOpenIncidentId] = useState<number | null>(() => incidentFromURL())
 
 	// Start from whatever was stored, so a returning user sees their pages
@@ -26,7 +27,7 @@ export function AppRoutes() {
 	const [checking, setChecking] = useState(() => isLoggedIn() && !getUser())
 
 	useEffect(() => {
-		const handlePopState = () => { setPath(normalizePath(window.location.pathname)); setOpenIncidentId(incidentFromURL()) }
+		const handlePopState = () => { setPath(normalizePath(window.location.pathname.slice(INGRESS_PREFIX.length))); setOpenIncidentId(incidentFromURL()) }
 		window.addEventListener('popstate', handlePopState)
 		return () => window.removeEventListener('popstate', handlePopState)
 	}, [])
@@ -55,13 +56,13 @@ export function AppRoutes() {
 		const normalized = normalizePath(nextPath)
 		setOpenIncidentId(null)
 		if (normalized !== path || window.location.search) {
-			window.history.pushState({}, '', normalized)
+			window.history.pushState({}, '', INGRESS_PREFIX + normalized)
 			setPath(normalized)
 		}
 	}
 	const viewIncident = (id: number) => {
 		const next = `/FiremeX/${user?.role === 'operator' ? 'operator' : 'admin'}/incidents`
-		window.history.pushState({}, '', `${next}?incident=${id}`)
+		window.history.pushState({}, '', `${INGRESS_PREFIX}${next}?incident=${id}`)
 		setOpenIncidentId(id)
 		setPath(next)
 	}

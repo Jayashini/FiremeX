@@ -53,6 +53,15 @@ func main() {
 		log.Fatal("Failed to migrate database: ", err)
 	}
 	log.Println("Database migration completed!")
+	if config.C.HAOS {
+		var count int64
+		if err := database.DB.Model(&models.Organization{}).Count(&count).Error; err != nil {
+			log.Fatal("Could not check installation organization: ", err)
+		}
+		if count > 1 {
+			log.Fatal("HAOS mode requires a database with at most one active organization")
+		}
+	}
 	if err := incidents.BackfillAlerts(database.DB); err != nil {
 		log.Fatal("Failed to backfill incident alerts: ", err)
 	}
@@ -73,14 +82,27 @@ func main() {
 
 	// 3. Initialize the Gin web framework
 	router := gin.Default()
+	if err := router.SetTrustedProxies(nil); err != nil {
+		log.Fatal(err)
+	}
+	if config.C.HAOS {
+		router.Use(middleware.RequireIngress)
+	}
+	if config.C.UIDir != "" {
+		if err := mountUI(router, config.C.UIDir); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	// 3.1 CORS Configuration
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     config.C.CORSOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		AllowCredentials: true,
-	}))
+	if !config.C.HAOS {
+		router.Use(cors.New(cors.Config{
+			AllowOrigins:     config.C.CORSOrigins,
+			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+			AllowCredentials: true,
+		}))
+	}
 
 	// 4. Test Route
 	router.GET("/ping", func(c *gin.Context) {

@@ -7,6 +7,7 @@ import (
 	"github.com/firemex/backend/database"
 	"github.com/firemex/backend/internal/incidents"
 	"github.com/firemex/backend/internal/inference"
+	"github.com/firemex/backend/middleware"
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -29,7 +30,7 @@ func positive(raw string) (uint, error) {
 	}
 	return uint(n), nil
 }
-func incidentDTO(row models.Incident) gin.H {
+func incidentDTO(c *gin.Context, row models.Incident) gin.H {
 	var result gin.H
 	b, _ := json.Marshal(row)
 	json.Unmarshal(b, &result)
@@ -56,13 +57,13 @@ func incidentDTO(row models.Incident) gin.H {
 	result["has_snapshot"] = has
 	result["snapshot_url"] = nil
 	if has {
-		result["snapshot_url"] = fmt.Sprintf("/api/incidents/%d/snapshot", row.ID)
+		result["snapshot_url"] = fmt.Sprintf("%s/api/incidents/%d/snapshot", middleware.IngressPrefix(c), row.ID)
 	}
 	return result
 }
 
-func incidentDetailDTO(db *gorm.DB, row models.Incident, user models.User) (gin.H, error) {
-	result := incidentDTO(row)
+func incidentDetailDTO(c *gin.Context, db *gorm.DB, row models.Incident, user models.User) (gin.H, error) {
+	result := incidentDTO(c, row)
 	var alert models.Alert
 	if err := db.Where("incident_id = ? AND organization_id = ?", row.ID, row.OrganizationID).First(&alert).Error; err != nil {
 		return nil, err
@@ -142,7 +143,7 @@ func GetIncidents(c *gin.Context) {
 	}
 	items := []gin.H{}
 	for _, r := range rows {
-		items = append(items, incidentDTO(r))
+		items = append(items, incidentDTO(c, r))
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(200, gin.H{"latest_id": latestID, "incidents": items, "total": total, "page": page, "page_size": size})
@@ -176,7 +177,7 @@ func GetIncident(c *gin.Context) {
 		if !valid {
 			return
 		}
-		dto, err := incidentDetailDTO(database.DB.WithContext(c.Request.Context()), r, user)
+		dto, err := incidentDetailDTO(c, database.DB.WithContext(c.Request.Context()), r, user)
 		if err != nil {
 			c.JSON(503, gin.H{"error": "Incident response details unavailable"})
 			return
@@ -286,7 +287,7 @@ func UpdateIncidentStatus(c *gin.Context) {
 		return
 	}
 	c.Header("Cache-Control", "no-store")
-	dto, err := incidentDetailDTO(database.DB.WithContext(c.Request.Context()), row, user)
+	dto, err := incidentDetailDTO(c, database.DB.WithContext(c.Request.Context()), row, user)
 	if err != nil {
 		c.JSON(503, gin.H{"error": "Incident response details unavailable"})
 		return

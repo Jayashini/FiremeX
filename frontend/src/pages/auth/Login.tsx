@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks'
-import { BASE } from '../../api'
+import { BASE, INGRESS_PREFIX, INGRESS_WRITE_HEADERS } from '../../api'
 import type { SessionUser } from '../../session'
 import { saveSession } from '../../session'
 
@@ -22,7 +22,7 @@ export function Login({ onNavigate, onSignedIn }: Props) {
 			// 1. Send the email and password to the Go backend
 			const response = await fetch(`${BASE}login`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { ...INGRESS_WRITE_HEADERS, 'Content-Type': 'application/json' },
 				body: JSON.stringify({ email, password })
 			})
 
@@ -48,7 +48,7 @@ export function Login({ onNavigate, onSignedIn }: Props) {
 		<section class="w-[450px] bg-[#21262D]/50 border border-brand-border rounded-3xl p-8 backdrop-blur-md shadow-2xl shadow-black relative mt-5">
 			{/* Brand Logo & Name */}
 			<div class="flex justify-center items-center gap-3 mb-10">
-				<img src="/logo.png" alt="FiremeX" class="w-12 h-12 object-contain border-2 border-[#8B949E]/40 rounded-xl bg-[#14B8A6]/10 pb-1" />
+				<img src={`${INGRESS_PREFIX}/logo.png`} alt="FiremeX" class="w-12 h-12 object-contain border-2 border-[#8B949E]/40 rounded-xl bg-[#14B8A6]/10 pb-1" />
 				<div class="flex flex-col leading-none">
 					<span class="text-lg font-bold text-slate-100 tracking-tight">Fireme<span class="text-accent">X</span></span>
 					<span class="text-[10px] text-[#8B949E] mt-1 tracking-wider">Fire & Security Monitoring</span>

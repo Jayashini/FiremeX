@@ -4,7 +4,7 @@
 // it on every request. The user object stored alongside it is purely so the app
 // knows which screens to draw without asking the server first. Someone editing
 // it in devtools sees different menus and still gets 403 from the API.
-import { API, BASE } from './api'
+import { API, BASE, INGRESS_WRITE_HEADERS } from './api'
 
 export type Organization = {
 	id: number
@@ -60,7 +60,7 @@ export function clearSession() {
 	// The server also set an HttpOnly cookie at login, which JavaScript cannot
 	// delete. Ask the server to expire it. Fire and forget - signing out of
 	// this tab should not wait on the network.
-	fetch(`${BASE}logout`, { method: 'POST' }).catch(() => {})
+	fetch(`${BASE}logout`, { method: 'POST', headers: INGRESS_WRITE_HEADERS }).catch(() => {})
 }
 
 export function isLoggedIn(): boolean {
@@ -70,6 +70,7 @@ export function isLoggedIn(): boolean {
 /** Headers for any call to a protected endpoint. */
 export function authHeaders(): Record<string, string> {
 	return {
+		...INGRESS_WRITE_HEADERS,
 		'Content-Type': 'application/json',
 		Authorization: `Bearer ${getToken() ?? ''}`,
 	}

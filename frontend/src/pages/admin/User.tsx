@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks'
-import { API } from '../../api'
+import { API, INGRESS_WRITE_HEADERS } from '../../api'
 
 type UserDetail = {
     id: string
@@ -28,6 +28,7 @@ export function User() {
 
     // Helper function to get auth headers
     const authHeaders = () => ({
+        ...INGRESS_WRITE_HEADERS,
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
     })

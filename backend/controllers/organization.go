@@ -1,19 +1,27 @@
 package controllers
 
 import (
-	"fmt"
-	"math/rand"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"errors"
 	"net/http"
 
+	"github.com/firemex/backend/config"
 	"github.com/firemex/backend/database"
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
+
+var errInstallationConfigured = errors.New("installation already configured")
 
 // RegisterOrganization creates a new organization AND its admin user in one step
 func RegisterOrganization(c *gin.Context) {
 	var input struct {
+		SetupKey  string `json:"setup_key"`
 		OrgName   string `json:"org_name" binding:"required"`
 		Sector    string `json:"sector" binding:"required"`
 		Email     string `json:"email" binding:"required,email"`
@@ -33,57 +41,66 @@ func RegisterOrganization(c *gin.Context) {
 		return
 	}
 
-	// 1. Generate a unique org code like ORG-384
-	orgCode := fmt.Sprintf("ORG-%d", 100+rand.Intn(900))
-
-	// Make sure the code is unique
-	var existingOrg models.Organization
-	for database.DB.Where("code = ?", orgCode).First(&existingOrg).Error == nil {
-		orgCode = fmt.Sprintf("ORG-%d", 100+rand.Intn(900))
+	// An installation-wide HA credential grants access to the same cameras
+	// for every organization. Only the installation owner may create one.
+	if config.C.HAToken != "" || config.C.SetupKey != "" || config.C.HAOS {
+		supplied := sha256.Sum256([]byte(input.SetupKey))
+		expected := sha256.Sum256([]byte(config.C.SetupKey))
+		if len(config.C.SetupKey) < 32 || subtle.ConstantTimeCompare(supplied[:], expected[:]) != 1 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "A valid installation setup key is required"})
+			return
+		}
 	}
 
-	// 2. Create the organization
-	org := models.Organization{
-		Name:    input.OrgName,
-		Code:    orgCode,
-		Sector:  input.Sector,
-		Email:   input.Email,
-		Phone:   input.Phone,
-		Country: input.Country,
-	}
-
-	if err := database.DB.Create(&org).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to create organization"})
-		return
-	}
-
-	// 3. Hash the admin password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must fit within 72 bytes"})
+		return
+	}
+	code := make([]byte, 12)
+	if _, err := rand.Read(code); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate organization code"})
 		return
 	}
 
-	// 4. Create the admin user linked to this organization
-	adminUser := models.User{
-		Name:           input.AdminName,
-		Email:          input.Email,
-		Password:       string(hashedPassword),
-		Role:           "admin",
-		Status:         "active",
-		OrganizationID: &org.ID,
+	org := models.Organization{
+		Name: input.OrgName, Code: "ORG-" + hex.EncodeToString(code), Sector: input.Sector,
+		Email: input.Email, Phone: input.Phone, Country: input.Country,
 	}
-
-	if err := database.DB.Create(&adminUser).Error; err != nil {
-		// If user creation fails, clean up the org we just created
-		database.DB.Unscoped().Delete(&org)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already exists"})
+	err = database.DB.WithContext(c.Request.Context()).Transaction(func(tx *gorm.DB) error {
+		if config.C.HAOS {
+			// Serialize first-run setup even if two valid requests arrive together.
+			if err := tx.Exec("LOCK TABLE organizations IN SHARE ROW EXCLUSIVE MODE").Error; err != nil {
+				return err
+			}
+			var count int64
+			if err := tx.Unscoped().Model(&models.Organization{}).Count(&count).Error; err != nil {
+				return err
+			}
+			if count != 0 {
+				return errInstallationConfigured
+			}
+		}
+		if err := tx.Create(&org).Error; err != nil {
+			return err
+		}
+		return tx.Create(&models.User{
+			Name: input.AdminName, Email: input.Email, Password: string(hashedPassword),
+			Role: "admin", Status: "active", OrganizationID: &org.ID,
+		}).Error
+	})
+	if errors.Is(err, errInstallationConfigured) {
+		c.JSON(http.StatusConflict, gin.H{"error": "FireMeX is already configured. Sign in with your account."})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to create organization and administrator"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":  "Organization registered successfully!",
-		"org_code": orgCode,
+		"org_code": org.Code,
 		"org": gin.H{
 			"id":      org.ID,
 			"name":    org.Name,

@@ -6,6 +6,7 @@ import (
 
 	"github.com/firemex/backend/config"
 	"github.com/firemex/backend/database"
+	"github.com/firemex/backend/middleware"
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -77,9 +78,8 @@ func Login(c *gin.Context) {
 	//
 	//   HttpOnly      JavaScript cannot read it, so an XSS bug cannot steal it
 	//   SameSiteStrict another site cannot embed the feed using this session
-	//   secure=false   required over plain http; must become true behind HTTPS
-	c.SetSameSite(http.SameSiteStrictMode)
-	c.SetCookie(config.SessionCookie, tokenString, int(sessionLifetime.Seconds()), "/", "", false, true)
+	//   Secure        enabled when served over HTTPS
+	setSessionCookie(c, tokenString, int(sessionLifetime.Seconds()))
 
 	// The user is returned alongside the token so the frontend knows which
 	// screens to show without an extra round trip. This is for display only -
@@ -97,7 +97,13 @@ func Login(c *gin.Context) {
 // removes the browser's copy. It is deliberately a public route so that an
 // already-expired session can still be cleaned up.
 func Logout(c *gin.Context) {
-	c.SetSameSite(http.SameSiteStrictMode)
-	c.SetCookie(config.SessionCookie, "", -1, "/", "", false, true)
+	setSessionCookie(c, "", -1)
 	c.JSON(http.StatusOK, gin.H{"message": "Signed out"})
+}
+
+func setSessionCookie(c *gin.Context, value string, maxAge int) {
+	path := middleware.IngressPrefix(c) + "/"
+	secure := c.Request.TLS != nil || (config.C.HAOS && c.GetHeader("X-Forwarded-Proto") == "https")
+	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetCookie(config.SessionCookie, value, maxAge, path, "", secure, true)
 }
