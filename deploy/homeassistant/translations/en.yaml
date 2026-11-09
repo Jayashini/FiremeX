@@ -1,0 +1,4 @@
+configuration:
+  setup_key:
+    name: Setup key
+    description: Use a random key of at least 32 characters. Enter the same key when creating the first FireMeX administrator.

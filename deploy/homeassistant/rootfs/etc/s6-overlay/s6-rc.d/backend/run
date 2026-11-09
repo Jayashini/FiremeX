@@ -1,0 +1,71 @@
+#!/command/with-contenv sh
+set -eu
+
+pg_bin=/usr/lib/postgresql/15/bin
+pg_socket=/run/firemex-postgres
+
+if [ -z "${FIREMEX_SETUP_KEY:-}" ]; then
+    FIREMEX_SETUP_KEY=$(python3 - <<'PY'
+import json
+
+try:
+    with open("/data/options.json", encoding="utf-8") as options:
+        key = json.load(options).get("setup_key")
+except (OSError, ValueError, AttributeError):
+    raise SystemExit("Unable to read the FireMeX setup key from app options")
+
+if not isinstance(key, str) or len(key.strip()) < 32:
+    raise SystemExit("Set a FireMeX setup key of at least 32 characters in app Configuration")
+print(key.strip())
+PY
+    )
+fi
+
+echo "Waiting for PostgreSQL"
+for attempt in $(seq 1 60); do
+    if s6-setuidgid postgres "$pg_bin/pg_isready" -q -t 1 -h "$pg_socket" -d postgres; then
+        break
+    fi
+    if [ "$attempt" -eq 60 ]; then
+        echo "PostgreSQL did not become ready" >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+s6-setuidgid postgres "$pg_bin/psql" -X -q -h "$pg_socket" -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+SELECT 'CREATE ROLE firemex LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'firemex')
+\gexec
+SELECT 'CREATE DATABASE firemex OWNER firemex' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'firemex')
+\gexec
+SQL
+
+echo "Waiting for Python inference"
+python3 - <<'PY'
+import json
+import time
+import urllib.request
+
+deadline = time.monotonic() + 90
+while time.monotonic() < deadline:
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8100/health", timeout=2) as response:
+            if json.load(response).get("ok"):
+                break
+    except (OSError, ValueError):
+        pass
+    time.sleep(1)
+else:
+    raise SystemExit("Python inference did not become ready")
+PY
+
+install -d -m 0700 -o firemex -g firemex /data/firemex
+export FIREMEX_HAOS=true
+export FIREMEX_SETUP_KEY
+export FIREMEX_DATA_DIR=/data/firemex
+export FIREMEX_UI_DIR=/opt/firemex/ui
+export DATABASE_DSN="host=$pg_socket user=firemex dbname=firemex sslmode=disable"
+export MODEL_URL=http://127.0.0.1:8100
+export PORT=8099
+
+exec s6-setuidgid firemex /opt/firemex/firemex

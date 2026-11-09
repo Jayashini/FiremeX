@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+pg_bin=/usr/lib/postgresql/15/bin
+pg_data=/data/postgresql
+pg_socket=/run/firemex-postgres
+
+install -d -m 0700 -o postgres -g postgres "$pg_data"
+install -d -m 0755 -o postgres -g postgres "$pg_socket"
+
+if [ ! -f "$pg_data/PG_VERSION" ]; then
+    s6-setuidgid postgres "$pg_bin/initdb" \
+        -D "$pg_data" --encoding=UTF8 --locale=C.UTF-8 \
+        --auth-local=peer --auth-host=reject
+fi
+
+exec s6-setuidgid postgres "$pg_bin/postgres" \
+    -D "$pg_data" \
+    -c listen_addresses= \
+    -c "unix_socket_directories=$pg_socket"

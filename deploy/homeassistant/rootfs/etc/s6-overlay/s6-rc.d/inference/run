@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+install -d -m 0700 -o firemex-model -g firemex-model \
+    /run/firemex-model /run/firemex-model/yolo /run/firemex-model/matplotlib
+
+export HOME=/run/firemex-model
+export YOLO_CONFIG_DIR=/run/firemex-model/yolo
+export MPLCONFIGDIR=/run/firemex-model/matplotlib
+export PORT=8100
+
+cd /opt/firemex/model
+exec s6-setuidgid firemex-model /opt/firemex/venv/bin/python detect_service.py
