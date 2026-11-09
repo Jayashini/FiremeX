@@ -1,3 +1,4 @@
+import { INGRESS_PREFIX } from '../../api'
 import type { SessionUser } from '../../session'
 import { UserFooter } from './UserFooter'
 
@@ -84,7 +85,7 @@ export function AdminSidebar({ activePage, onNavigate, user }: Props) {
 			<div class="flex flex-col gap-8">
 				{/* Brand Logo & Name */}
 				<div class="flex items-center gap-3 mb-5 pb-5 border-b border-[#8B949E]/10">
-					<img src="/logo.png" alt="FiremeX" class="w-12 h-12 object-contain border-2 border-[#8B949E]/40 rounded-xl bg-[#14B8A6]/10 pb-1" />
+					<img src={`${INGRESS_PREFIX}/logo.png`} alt="FiremeX" class="w-12 h-12 object-contain border-2 border-[#8B949E]/40 rounded-xl bg-[#14B8A6]/10 pb-1" />
 					<div class="flex flex-col leading-none ">
 						<span class="text-lg font-bold text-slate-100 tracking-tight">Fireme<span class="text-accent">X</span></span>
 						<span class="text-[10px] text-[#8B949E] mt-1 tracking-wider">Fire & Security Monitoring</span>

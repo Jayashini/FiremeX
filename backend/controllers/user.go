@@ -6,6 +6,7 @@ import (
 	"github.com/firemex/backend/database"
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // Every handler here is admin-only (see main.go) AND scoped to the caller's
@@ -43,10 +44,14 @@ func ApproveUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id := c.Param("id")
+	id, err := positive(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
 
 	var user models.User
-	if err := database.DB.Where("organization_id = ?", orgID).First(&user, id).Error; err != nil {
+	if err := database.DB.Where("organization_id = ? AND id = ?", orgID, id).First(&user).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -56,8 +61,9 @@ func ApproveUser(c *gin.Context) {
 		return
 	}
 
-	user.Status = "active"
-	database.DB.Save(&user)
+	if !updateUserStatus(c, &user, orgID, "active") {
+		return
+	}
 	forgetUser(user.ID)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -72,10 +78,14 @@ func DenyUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id := c.Param("id")
+	id, err := positive(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
 
 	var user models.User
-	if err := database.DB.Where("organization_id = ?", orgID).First(&user, id).Error; err != nil {
+	if err := database.DB.Where("organization_id = ? AND id = ?", orgID, id).First(&user).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -86,7 +96,10 @@ func DenyUser(c *gin.Context) {
 	}
 
 	// Permanently delete (not soft delete) since they were never approved
-	database.DB.Unscoped().Delete(&user)
+	result := database.DB.Unscoped().Where("organization_id = ? AND status = ?", orgID, "pending").Delete(&user)
+	if !userWriteSucceeded(c, result) {
+		return
+	}
 	forgetUser(user.ID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "User denied and removed"})
@@ -98,10 +111,14 @@ func RevokeUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	id := c.Param("id")
+	id, err := positive(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
 
 	var user models.User
-	if err := database.DB.Where("organization_id = ?", orgID).First(&user, id).Error; err != nil {
+	if err := database.DB.Where("organization_id = ? AND id = ?", orgID, id).First(&user).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
@@ -117,9 +134,27 @@ func RevokeUser(c *gin.Context) {
 		return
 	}
 
-	user.Status = "revoked"
-	database.DB.Save(&user)
+	if !updateUserStatus(c, &user, orgID, "revoked") {
+		return
+	}
 	forgetUser(user.ID)
 
 	c.JSON(http.StatusOK, gin.H{"message": "User access revoked"})
+}
+
+func updateUserStatus(c *gin.Context, user *models.User, orgID uint, status string) bool {
+	result := database.DB.Model(user).Where("organization_id = ? AND status = ?", orgID, user.Status).Update("status", status)
+	return userWriteSucceeded(c, result)
+}
+
+func userWriteSucceeded(c *gin.Context, result *gorm.DB) bool {
+	if result.Error != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "User storage unavailable"})
+		return false
+	}
+	if result.RowsAffected != 1 {
+		c.JSON(http.StatusConflict, gin.H{"error": "User changed. Refresh and try again."})
+		return false
+	}
+	return true
 }

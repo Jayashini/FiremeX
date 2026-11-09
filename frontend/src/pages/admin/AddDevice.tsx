@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { API } from '../../api'
+import { API, INGRESS_WRITE_HEADERS } from '../../api'
 import { rememberBrowserWebcam } from '../../browserWebcams'
 
 type Props = {
@@ -272,6 +272,7 @@ export function AddDevice({ onNavigate }: Props) {
 			const res = await fetch(`${API}cameras`, {
 				method: 'POST',
 				headers: {
+					...INGRESS_WRITE_HEADERS,
 					'Content-Type': 'application/json',
 					Authorization: `Bearer ${token}`
 				},

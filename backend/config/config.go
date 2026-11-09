@@ -33,6 +33,9 @@ const devPassword = "secretpassword"
 
 // Config holds every setting FiremeX needs to run.
 type Config struct {
+	HAOS                                                                 bool
+	UIDir                                                                string
+	SetupKey                                                             string
 	DetectionEnabled                                                     bool
 	ModelURL                                                             string
 	DetectionInterval, ModelTimeout, IncidentCooldown, EvidenceRetention time.Duration
@@ -63,13 +66,21 @@ var C Config
 // Do not move this into a package-level variable: Go initialises those before
 // main() runs, which would be before the .env file has been read.
 func Load() {
-	dataDir := env("FIREMEX_DATA_DIR", ".")
+	haos := boolean("FIREMEX_HAOS", false)
+	defaultData, defaultPort := ".", "8080"
+	if haos {
+		defaultData, defaultPort = "/data", "8099"
+	}
+	dataDir := env("FIREMEX_DATA_DIR", defaultData)
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		log.Println("config: could not create data dir:", err)
 	}
 
 	C = Config{
-		Port:        env("PORT", "8080"),
+		HAOS:        haos,
+		UIDir:       os.Getenv("FIREMEX_UI_DIR"),
+		SetupKey:    os.Getenv("FIREMEX_SETUP_KEY"),
+		Port:        env("PORT", defaultPort),
 		DatabaseDSN: databaseDSN(),
 		HAURL:       env("HA_URL", "http://localhost:8123"),
 		HAToken:     env("HA_TOKEN", ""),
@@ -90,6 +101,16 @@ func Load() {
 	C.EvidenceMaxBytes = integer("EVIDENCE_MAX_BYTES", 1<<30, 1, 1<<40)
 	C.FireThreshold = score("FIRE_CONFIDENCE_THRESHOLD", 0.5)
 	C.SmokeThreshold = score("SMOKE_CONFIDENCE_THRESHOLD", 0.5)
+	if C.HAOS {
+		C.HAURL = "http://supervisor/core"
+		C.HAToken = os.Getenv("SUPERVISOR_TOKEN")
+		if C.HAToken == "" || C.UIDir == "" || os.Getenv("DATABASE_DSN") == "" || strings.Contains(C.DatabaseDSN, devPassword) {
+			log.Fatal("HAOS mode requires SUPERVISOR_TOKEN, FIREMEX_UI_DIR and a non-development DATABASE_DSN")
+		}
+		if len(C.SetupKey) < 32 {
+			log.Fatal("HAOS mode requires FIREMEX_SETUP_KEY with at least 32 characters")
+		}
+	}
 	C.JWTSecret = []byte(resolveSecret(dataDir))
 
 	if C.HAToken == "" {
@@ -142,6 +163,9 @@ func resolveSecret(dataDir string) string {
 	secret := hex.EncodeToString(buf)
 
 	if err := os.WriteFile(path, []byte(secret), 0o600); err != nil {
+		if C.HAOS {
+			log.Fatal("config: could not persist signing secret: ", err)
+		}
 		log.Println("config: generated a signing secret but could not save it:", err)
 		log.Println("config: operators will be logged out on the next restart")
 	} else {

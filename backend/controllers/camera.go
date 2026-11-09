@@ -22,6 +22,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -31,6 +32,8 @@ import (
 	"github.com/firemex/backend/models"
 	"github.com/gin-gonic/gin"
 )
+
+var haCameraEntity = regexp.MustCompile(`^camera\.[a-z0-9_]+$`)
 
 // HAState is one entity from Home Assistant's /api/states response.
 //
@@ -84,13 +87,10 @@ func GetAvailableCameras(c *gin.Context) {
 		return
 	}
 
-	// Home Assistant names entities as "<domain>.<name>", so every camera -
-	// regardless of which integration created it - starts with "camera.".
-	// That single rule is why FiremeX works with any camera type without
-	// knowing anything about the hardware.
+	// List HA camera entities. Image availability is checked when fetching a snapshot.
 	var cameras []gin.H
 	for _, s := range states {
-		if len(s.EntityID) >= 7 && s.EntityID[:7] == "camera." {
+		if haCameraEntity.MatchString(s.EntityID) {
 			// friendly_name is what the user typed in Home Assistant. Fall
 			// back to the raw entity id so the dropdown is never blank.
 			friendlyName, _ := s.Attributes["friendly_name"].(string)
@@ -137,6 +137,10 @@ func AddCamera(c *gin.Context) {
 	}
 	if input.SourceType != "home_assistant" && input.SourceType != "browser" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "source_type must be home_assistant or browser"})
+		return
+	}
+	if input.SourceType == "home_assistant" && !haCameraEntity.MatchString(input.EntityID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Home Assistant camera entity ID"})
 		return
 	}
 	camera := models.Camera{
@@ -224,6 +228,10 @@ func StreamCamera(c *gin.Context) {
 		return
 	}
 	entityID := c.Param("entity_id")
+	if !haCameraEntity.MatchString(entityID) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Camera not found"})
+		return
+	}
 
 	// Only proxy cameras this organisation has actually added. Without this
 	// check any logged-in user could stream any Home Assistant camera simply
@@ -239,7 +247,7 @@ func StreamCamera(c *gin.Context) {
 	haToken := config.C.HAToken
 
 	reqURL := fmt.Sprintf("%s/api/camera_proxy_stream/%s", haURL, entityID)
-	req, err := http.NewRequest("GET", reqURL, nil)
+	req, err := http.NewRequestWithContext(c.Request.Context(), "GET", reqURL, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create stream request"})
 		return
@@ -304,6 +312,10 @@ func SnapshotCamera(c *gin.Context) {
 		return
 	}
 	entityID := c.Param("entity_id")
+	if !haCameraEntity.MatchString(entityID) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Camera not found"})
+		return
+	}
 
 	// Same ownership rule as the stream: only cameras this organisation added.
 	var camera models.Camera

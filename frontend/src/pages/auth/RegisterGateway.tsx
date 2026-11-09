@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks'
-import { BASE } from '../../api'
+import { BASE, INGRESS_PREFIX, INGRESS_WRITE_HEADERS } from '../../api'
 import { COUNTRIES } from '../../constants/countries'
 import { isValidPhoneForCountry } from './phoneValidation'
 
@@ -19,6 +19,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 	const [orgName, setOrgName] = useState('')
 	const [orgEmail, setOrgEmail] = useState('')
 	const [orgAdminName, setOrgAdminName] = useState('')
+	const [setupKey, setSetupKey] = useState('')
 	const [orgPassword, setOrgPassword] = useState('')
 	const [orgConfirmPassword, setOrgConfirmPassword] = useState('')
 	const [orgSector, setOrgSector] = useState('Industrial')
@@ -73,7 +74,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 		try {
 			const response = await fetch(`${BASE}register/organization`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { ...INGRESS_WRITE_HEADERS, 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					org_name: orgName,
 					sector: orgSector,
@@ -81,7 +82,8 @@ export function RegisterGateway({ onNavigate }: Props) {
 					phone: orgPhone,
 					country: orgCountry,
 					admin_name: orgAdminName,
-					password: orgPassword
+					password: orgPassword,
+					setup_key: setupKey
 				})
 			})
 
@@ -106,8 +108,8 @@ export function RegisterGateway({ onNavigate }: Props) {
 	const handleOperatorSubmit = async (e: Event) => {
 		e.preventDefault()
 
-		if (!/^[A-Z]{3}-[0-9]{3}$/.test(orgCode)) {
-			showToast('error', 'Organization code must be 3 uppercase letters, a hyphen, and 3 numbers (e.g. ORG-100)')
+		if (!/^(?:[A-Z]{3}-[0-9]{3}|ORG-[a-f0-9]{24})$/.test(orgCode)) {
+			showToast('error', 'Enter the organization code provided by your administrator.')
 			return
 		}
 
@@ -121,7 +123,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 		try {
 			const response = await fetch(`${BASE}register/operator`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { ...INGRESS_WRITE_HEADERS, 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					name: operatorName,
 					email: operatorEmail,
@@ -217,7 +219,7 @@ export function RegisterGateway({ onNavigate }: Props) {
 			<div class="w-full flex flex-col items-center">
 				{/* Brand Logo & Name */}
 				<div class="flex justify-center items-center gap-3 mb-8">
-					<img src="/logo.png" alt="FiremeX" class="w-12 h-12 object-contain border-2 border-[#8B949E]/40 rounded-xl bg-[#14B8A6]/10 pb-1" />
+					<img src={`${INGRESS_PREFIX}/logo.png`} alt="FiremeX" class="w-12 h-12 object-contain border-2 border-[#8B949E]/40 rounded-xl bg-[#14B8A6]/10 pb-1" />
 					<div class="flex flex-col leading-none">
 						<span class="text-lg font-bold text-slate-100 tracking-tight">Fireme<span class="text-accent">X</span></span>
 						<span class="text-[10px] text-[#8B949E] mt-1 tracking-wider">Fire & Security Monitoring</span>
@@ -474,6 +476,18 @@ export function RegisterGateway({ onNavigate }: Props) {
 
 
 
+							<label class="flex flex-col gap-1.5 text-xs text-slate-400">
+								Installation setup key {INGRESS_PREFIX ? '' : '(if configured)'}
+								<input
+									type="password"
+									autoComplete="off"
+									required={!!INGRESS_PREFIX}
+									value={setupKey}
+									onInput={(event) => setSetupKey(event.currentTarget.value)}
+									class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-2.5 text-slate-200"
+								/>
+							</label>
+
 							<button
 								type="submit"
 								disabled={loading}
@@ -509,18 +523,18 @@ export function RegisterGateway({ onNavigate }: Props) {
 								<div class="relative">
 									<input
 										type="text"
-										placeholder="e.g. ORG-101"
+										placeholder="Enter organization code"
 										value={orgCode}
 										onInput={(e) => setOrgCode((e.target as HTMLInputElement).value)}
-										pattern="[A-Z]{3}-[0-9]{3}"
-										maxLength={7}
-										title="Enter 3 uppercase letters, a hyphen, and 3 numbers (e.g. ORG-100)"
+										pattern="(?:[A-Z]{3}-[0-9]{3}|ORG-[a-f0-9]{24})"
+										maxLength={28}
+										title="Enter the organization code provided by your administrator"
 										class="w-full bg-[#050B0D]/80 border border-brand-border rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all font-mono"
 										required
 									/>
 
 								</div>
-								<p class="text-[9px] text-slate-400">Enter 3 uppercase letters, a hyphen, and 3 numbers (e.g. ORG-100). Ask your Organization Administrator for the code.</p>
+								<p class="text-[9px] text-slate-400">Ask your organization administrator for the code.</p>
 							</div>
 
 							<div class="flex flex-col gap-1.5">
