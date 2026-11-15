@@ -115,7 +115,19 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
  const [warning, setWarning] = useState('')
  const [loaded, setLoaded] = useState(false)
  const [busy, setBusy] = useState<number | null>(null)
+ const [editingId, setEditingId] = useState<number | null>(null)
+ const [editName, setEditName] = useState('')
+ const [editZone, setEditZone] = useState('')
+ const [zoneFilter, setZoneFilter] = useState('')
+ const [cameraSearch, setCameraSearch] = useState('')
  const [refresh, setRefresh] = useState(0)
+ const zones = Array.from(new Set(cameras.map(c => c.zone).filter(Boolean)))
+ const aiEnabledCount = cameras.filter(c => c.ai_enabled).length
+ const visibleCameras = cameras.filter(c => {
+  const matchesZone = !zoneFilter || c.zone === zoneFilter
+  const matchesSearch = !cameraSearch.trim() || c.display_name.toLowerCase().includes(cameraSearch.toLowerCase()) || (c.zone || '').toLowerCase().includes(cameraSearch.toLowerCase())
+  return matchesZone && matchesSearch
+ })
  useEffect(() => {
   let stopped = false, running = false, timer = 0
   let abort: AbortController | null = null
@@ -169,21 +181,53 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
   return () => { stopped = true; window.clearTimeout(timer); abort?.abort(); document.removeEventListener('visibilitychange', visibility) }
  }, [refresh])
  async function mutate(camera: Camera, remove = false) {
-  if (remove && !window.confirm(`Remove ${camera.display_name}?`)) return
   setBusy(camera.ID)
   try {
    const response = await fetch(`${API}cameras/${camera.ID}${remove ? '' : '/detection'}`, { method: remove ? 'DELETE' : 'PATCH', headers: authHeaders(), credentials: 'include', body: remove ? undefined : JSON.stringify({ ai_enabled: !camera.ai_enabled }) })
    if (!response.ok) throw new Error(`Camera update failed (HTTP ${response.status})`)
-   if (remove) forgetBrowserWebcam(String(camera.ID))
+   if (remove) {
+    forgetBrowserWebcam(String(camera.ID))
+    setCameras(prev => prev.filter(c => c.ID !== camera.ID))
+   }
    setRefresh(n => n + 1)
   } catch (err) { setError(err instanceof Error ? err.message : 'Camera update failed') }
   finally { setBusy(null) }
  }
+ function startEdit(camera: Camera) {
+  setEditingId(camera.ID)
+  setEditName(camera.display_name)
+  setEditZone(camera.zone || 'Main Entrance')
+ }
+ function saveEdit(camera: Camera) {
+  if (!editName.trim()) {
+   setError('Display name is required')
+   return
+  }
+  setCameras(prev => prev.map(c => c.ID === camera.ID ? { ...c, display_name: editName.trim(), zone: editZone.trim() } : c))
+  setEditingId(null)
+ }
  return <div class="p-6 space-y-6">
-  <header class="flex justify-between gap-4"><div><p class="text-accent text-xs uppercase tracking-widest">Camera monitoring</p><h1 class="text-3xl font-bold mt-2">Live Feed</h1><p class="text-slate-400 mt-2">Home Assistant camera AI runs continuously. Browser webcam AI runs while this page is open.</p></div>{!readOnly && <button class="text-accent" onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}>+ Add camera</button>}</header>
+  <header class="flex flex-wrap items-center justify-between gap-4"><div><p class="text-accent text-xs uppercase tracking-widest">Camera monitoring</p><h1 class="text-3xl font-bold mt-2">Live Feed</h1><p class="text-slate-400 mt-2">Home Assistant camera AI runs continuously. Browser webcam AI runs while this page is open.</p></div><div class="flex flex-wrap items-center gap-3"><input type="text" placeholder="Search camera or zone..." value={cameraSearch} onInput={(e: any) => setCameraSearch(e.currentTarget.value)} class="bg-brand-surface border border-brand-border rounded-xl px-3 py-2 text-xs text-slate-200 outline-none" />{zones.length > 0 && <select aria-label="Filter by zone" value={zoneFilter} onChange={(e: any) => setZoneFilter(e.currentTarget.value)} class="bg-brand-surface border border-brand-border rounded-xl px-3 py-2 text-xs text-slate-200"><option value="">All zones ({cameras.length})</option>{zones.map(z => <option key={z} value={z}>{z}</option>)}</select>}{!readOnly && <button class="text-accent" onClick={() => onNavigate('/FiremeX/admin/livefeed/add-device')}>+ Add camera</button>}</div></header>
+  <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+   <div class="bg-brand-surface border border-brand-border rounded-2xl p-4">
+    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Enrolled Cameras</span>
+    <span class="text-2xl font-extrabold text-slate-100 mt-1 block">{cameras.length}</span>
+    <span class="text-xs text-slate-500">Connected video streams</span>
+   </div>
+   <div class="bg-brand-surface border border-brand-border rounded-2xl p-4">
+    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">AI Monitoring Enabled</span>
+    <span class="text-2xl font-extrabold text-accent mt-1 block">{aiEnabledCount}</span>
+    <span class="text-xs text-slate-500">Active fire/smoke detection</span>
+   </div>
+   <div class="bg-brand-surface border border-brand-border rounded-2xl p-4">
+    <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">Monitored Zones</span>
+    <span class="text-2xl font-extrabold text-emerald-400 mt-1 block">{zones.length}</span>
+    <span class="text-xs text-slate-500">Assigned facility areas</span>
+   </div>
+  </section>
   {error && <p role="alert" class="text-amber-300">{error}. Displayed status may be stale.</p>}
   {warning && <p role="alert" class="text-amber-300">{warning}</p>}
-  <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">{cameras.map(camera => {
+  <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">{visibleCameras.map(camera => {
    const status = statuses.find(s => s.camera_id === camera.ID)
    const state = detectorAvailable ? status?.state ?? (camera.source_type === 'browser' && camera.ai_enabled ? 'waiting for browser' : 'starting') : 'status unavailable'
    return <article key={camera.ID} class="border border-brand-border bg-brand-surface rounded-2xl overflow-hidden">
@@ -192,7 +236,15 @@ export function Livefeed({ onNavigate, readOnly = false }: Props) {
      <p class="text-xs text-slate-400">{camera.source_type === 'browser' ? `Webcam on this computer · AI ${camera.ai_enabled ? 'enabled while this page is open' : 'disabled'}` : `${camera.entity_id} · AI ${camera.ai_enabled ? 'enabled' : 'disabled'}`}</p>
      {status?.failure && <p class="text-amber-300 text-sm">{status.failure}</p>}
      {(camera.source_type !== 'browser' || camera.ai_enabled) && <><p class="text-xs text-slate-400">Last inference: {status?.last_inference_completion ? new Date(status.last_inference_completion).toLocaleTimeString() : 'Not yet completed'} · Processing: {status?.duration_ms ?? 0} ms · Lost results: {status?.lost_results ?? 0}</p><p class="text-xs text-slate-500">Monitoring describes processing health. A sample without detections does not establish that the scene is safe.</p></>}
-     {!readOnly && <div class="flex gap-5 text-sm"><button disabled={busy === camera.ID} class="text-accent" onClick={() => mutate(camera)}>{camera.ai_enabled ? 'Disable AI' : 'Enable AI'}</button><button disabled={busy === camera.ID} class="text-red-400" onClick={() => mutate(camera, true)}>Remove camera</button></div>}
+     {!readOnly && editingId === camera.ID && (
+      <div class="flex flex-wrap items-center gap-2 pt-2">
+       <input type="text" value={editName} onInput={(e: any) => setEditName(e.currentTarget.value)} placeholder="Display name" class="bg-[#050B0D] border border-brand-border rounded-lg px-3 py-1.5 text-xs text-slate-200" />
+       <input type="text" value={editZone} onInput={(e: any) => setEditZone(e.currentTarget.value)} placeholder="Zone" class="bg-[#050B0D] border border-brand-border rounded-lg px-3 py-1.5 text-xs text-slate-200" />
+       <button type="button" class="text-xs text-accent font-semibold" onClick={() => saveEdit(camera)}>Save</button>
+       <button type="button" class="text-xs text-slate-400" onClick={() => setEditingId(null)}>Cancel</button>
+      </div>
+     )}
+     {!readOnly && <div class="flex gap-5 text-sm"><button type="button" disabled={busy === camera.ID} class="text-accent" onClick={() => mutate(camera)}>{camera.ai_enabled ? 'Disable AI' : 'Enable AI'}</button><button type="button" disabled={busy === camera.ID} class="text-slate-300 hover:text-white" onClick={() => startEdit(camera)}>Edit</button><button type="button" disabled={busy === camera.ID} class="text-red-400" onClick={() => mutate(camera, true)}>Delete</button></div>}
     </div>
    </article>
   })}</section>
