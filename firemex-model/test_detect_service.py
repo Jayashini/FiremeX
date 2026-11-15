@@ -51,6 +51,28 @@ class Contract(unittest.TestCase):
         self.assertEqual(response.json()['detections'], [])
         self.assertFalse(response.json()['hazard'])
 
+    def test_small_flame_is_reported_but_is_not_a_hazard(self):
+        class Flame(Box):
+            cls = [2]
+        self.fake.names = {0: 'smoke', 1: 'fire', 2: 'small_flame'}
+        self.fake.boxes = [Flame()]
+        body = self.post().json()
+        self.assertFalse(body['hazard'])
+        self.assertEqual(body['detections'], [])
+        self.assertEqual([d['label'] for d in body['small_flames']], ['small_flame'])
+
+    def test_fire_beside_a_small_flame_is_still_a_hazard(self):
+        class Flame(Box):
+            cls = [2]
+        class Fire(Box):
+            cls = [1]
+        self.fake.names = {0: 'smoke', 1: 'fire', 2: 'small_flame'}
+        self.fake.boxes = [Flame(), Fire()]
+        body = self.post().json()
+        self.assertTrue(body['hazard'])
+        self.assertEqual([d['label'] for d in body['detections']], ['fire'])
+        self.assertEqual(len(body['small_flames']), 1)
+
     def test_invalid_inputs(self):
         self.assertEqual(self.post(b'broken').status_code, 400)
         self.assertEqual(self.post(threshold='nan').status_code, 422)

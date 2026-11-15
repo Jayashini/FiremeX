@@ -22,6 +22,10 @@ PORT = int(os.environ.get("PORT", "8100"))
 MAX_BYTES = 10 * 1024 * 1024
 MAX_PIXELS = 20_000_000
 Image.MAX_IMAGE_PIXELS = MAX_PIXELS
+# fire and smoke are hazards. small_flame (a lighter or candle, model-v5) is
+# reported separately and never makes "hazard" true: it is a flame, not a fire.
+HAZARD_LABELS = {"fire", "smoke"}
+INFO_LABELS = {"small_flame"}
 model = None
 model_version = None
 inference_lock = threading.Lock()
@@ -36,8 +40,9 @@ async def lifespan(app):
     with open(MODEL_PATH, "rb") as weights:
         model_version = "sha256:" + hashlib.file_digest(weights, "sha256").hexdigest()
     model = YOLO(MODEL_PATH)
-    if set(model.names.values()) != {"fire", "smoke"}:
-        raise ValueError("Model must have exactly fire and smoke classes")
+    names = set(model.names.values())
+    if not HAZARD_LABELS <= names <= HAZARD_LABELS | INFO_LABELS:
+        raise ValueError("Model must have fire and smoke classes (and optionally small_flame)")
     # The first CPU prediction can spend tens of seconds initializing kernels.
     # Do that before health reports ready, so the first monitored frame has the
     # same bounded latency as later frames.
@@ -107,20 +112,24 @@ def infer(raw, annotate, cutoff):
         except Exception:
             raise HTTPException(400, "could not decode bounded JPEG/PNG")
         results = model(frame, conf=cutoff, device="cpu", verbose=False)[0]
-        detections = []
+        detections, small_flames = [], []
         for box in results.boxes:
             confidence = float(box.conf[0])
             label = results.names[int(box.cls[0])]
             x1, y1, x2, y2 = (float(v) for v in box.xyxy[0])
-            if (label not in {"fire", "smoke"} or not math.isfinite(confidence)
+            if (label not in HAZARD_LABELS | INFO_LABELS or not math.isfinite(confidence)
                     or not 0 <= confidence <= 1 or not all(map(math.isfinite, (x1, y1, x2, y2)))
                     or not 0 <= x1 < x2 <= frame.width or not 0 <= y1 < y2 <= frame.height):
                 raise HTTPException(500, "invalid model output")
             if confidence < cutoff:
                 continue
-            detections.append({"label": label, "confidence": confidence,
-                               "box": {"x1": x1, "y1": y1, "x2": x2, "y2": y2}})
-        response = {"hazard": bool(detections), "detections": detections, "model_version": model_version}
+            found = {"label": label, "confidence": confidence,
+                     "box": {"x1": x1, "y1": y1, "x2": x2, "y2": y2}}
+            (detections if label in HAZARD_LABELS else small_flames).append(found)
+        # "detections" and "hazard" stay fire/smoke only - the contract the Go
+        # backend validates. Small flames are extra information beside them.
+        response = {"hazard": bool(detections), "detections": detections,
+                    "small_flames": small_flames, "model_version": model_version}
         if annotate and detections:
             response["annotated_image"] = base64.b64encode(draw_boxes(frame, detections)).decode("ascii")
         return response
